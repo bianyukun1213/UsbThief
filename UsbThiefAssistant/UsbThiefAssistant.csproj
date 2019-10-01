@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\MSBuilder.CodeTaskAssembly.0.2.5\build\MSBuilder.CodeTaskAssembly.props" Condition="Exists('..\packages\MSBuilder.CodeTaskAssembly.0.2.5\build\MSBuilder.CodeTaskAssembly.props')" />
+  <Import Project="..\packages\MSBuilder.CodeTaskAssembly.0.2.6\build\MSBuilder.CodeTaskAssembly.props" Condition="Exists('..\packages\MSBuilder.CodeTaskAssembly.0.2.6\build\MSBuilder.CodeTaskAssembly.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -38,6 +38,9 @@
     <ApplicationIcon>imageres_0106.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.Win32.TaskScheduler, Version=2.8.15.0, Culture=neutral, PublicKeyToken=c416bc1b32d97233, processorArchitecture=MSIL">
+      <HintPath>..\packages\TaskScheduler.2.8.15\lib\net35\Microsoft.Win32.TaskScheduler.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -88,6 +91,6 @@
     <PropertyGroup>
       <ErrorText>这台计算机上缺少此项目引用的 NuGet 程序包。使用“NuGet 程序包还原”可下载这些程序包。有关更多信息，请参见 http://go.microsoft.com/fwlink/?LinkID=322105。缺少的文件是 {0}。</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\MSBuilder.CodeTaskAssembly.0.2.5\build\MSBuilder.CodeTaskAssembly.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MSBuilder.CodeTaskAssembly.0.2.5\build\MSBuilder.CodeTaskAssembly.props'))" />
+    <Error Condition="!Exists('..\packages\MSBuilder.CodeTaskAssembly.0.2.6\build\MSBuilder.CodeTaskAssembly.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\MSBuilder.CodeTaskAssembly.0.2.6\build\MSBuilder.CodeTaskAssembly.props'))" />
   </Target>
 </Project>

