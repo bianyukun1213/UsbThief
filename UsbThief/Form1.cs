@@ -73,6 +73,17 @@ namespace UsbThief
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
             notifyIcon1.ContextMenuStrip.Items[0].Click += Item0_Click;
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
+            try
+            {
+                if (!Directory.Exists(workspace))
+                {
+                    Directory.CreateDirectory(workspace);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error("无法创建工作区目录：\n" + e);
+            }
             HideFiles(workspace);
             try
             {
