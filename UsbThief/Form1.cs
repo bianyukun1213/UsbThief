@@ -157,7 +157,8 @@ namespace UsbThief
                     {
                         string tmpSer = line.Split(':')[0];
                         string status = line.Split(':')[1];
-                        devices.Add(tmpSer, status);
+                        if (!devices.ContainsKey(tmpSer))
+                            devices.Add(tmpSer, status);
                     }
                     sr.Close();
                     foreach (var item in devices)
@@ -171,17 +172,7 @@ namespace UsbThief
                 }
                 catch (Exception)
                 {
-                    try
-                    {
-                        if (File.Exists(Application.StartupPath + "\\status"))
-                            File.Delete(Application.StartupPath + "\\status");
-                        FileStream fs = File.Create(Application.StartupPath + "\\status");
-                        fs.Close();
-                    }
-                    catch (Exception)
-                    {
-                        logger.Info("初始化状态文件失败");
-                    }
+                    logger.Info("初始化状态文件失败");
                 }
             }
             else
@@ -288,11 +279,11 @@ namespace UsbThief
                                                 {
                                                     string tmpSer = line.Split(':')[0];
                                                     string status = line.Split(':')[1];
-                                                    if (status == Status.none.ToString())
+                                                    if (status == Status.none.ToString() && !devices.ContainsKey(tmpSer))
                                                     {
                                                         devices.Add(tmpSer, false);
                                                     }
-                                                    else if (status == Status.exporting.ToString())
+                                                    else if (status == Status.exporting.ToString() && !devices.ContainsKey(tmpSer))
                                                     {
                                                         devices.Add(tmpSer, true);
                                                     }
