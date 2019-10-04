@@ -117,60 +117,7 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <metadata name="notifyIcon1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-    <value>17, 17</value>
-  </metadata>
-  <metadata name="contextMenuStrip1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-    <value>135, 17</value>
-  </metadata>
-  <assembly alias="System.Drawing" name="System.Drawing, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
-  <data name="toolStripMenuItem1.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-    <value>
-        iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAO
-        wwAADsMBx2+oZAAAAWpJREFUOE9jQAYTJ070WL169f9Zs2b9nzFjBhiD2DNnzvwPEgfJQ5ViBzADvn3/
-        gYFXrVpFmQFEuwBkEzZAtAvWrFkD1YIK8BpQVla2pby8/H9HRwdBDFIHVL8bqhWs+SZI8Mjpy/+rqqoI
-        YpA6qCF3wQaAOAeOnQHj9PR0ghimFqQPbsCmrTvAODg4GAU/fPICAzdNWAjGMDZBA/YcOfP/z9+/YHz2
-        /MX/WYVV/1NmnP5ftfPH/0XLVkIMgKW6y7ceoWCQASCNy1eu+e/iH/1/weLlYP6eI6f/SyuqIwz48vkr
-        GNs7uIKjq6e7679/bhfYiffuPQJrbj31+7+krOL/12/egA3w8w+GeAFmOwgrK5uADQABn2W//8fm1IAN
-        mDFn4X8ldd3/K1atBfNBNoMMARuADkBJFtkAkGKQrSCNIAzShNcA5KQMMgCGQYqRsV9Uxv+E/AbsLgBl
-        X1A2hmVrEA0ShypBAgwMADaLPKR8JeFKAAAAAElFTkSuQmCC
-</value>
-  </data>
-  <data name="toolStripMenuItem2.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-    <value>
-        iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAO
-        wwAADsMBx2+oZAAAAO9JREFUOE9jGAXDDhw5coT3yNHjCw4fOX7k4KFjN5Dx4cPH9oLkzpw5wwpVjgCH
-        Dh3LBeKthw4f//bwwcP/b1+//v/+7VsU/O7Nm//3793/DzT8O1gtUA9Yc1FRVcL6dVuebli/5T8xeOOG
-        rWAapAekF2TA//37j/y/eu3Gf2LAze8n/1+7dvM/0Fv/QXrBBuzcsRdswI2bT/HikpKK//EHDP4npSSD
-        XQI3AOQkYgzI7Uv4H/yK839AQDBYD8kGgFyQuNHmf3R0HMKAvr7pTyMiYsECxOClx6aDaZAekF5wLBQW
-        Vp0DmUYi3llUVJUAAO7PnKonyUEVAAAAAElFTkSuQmCC
-</value>
-  </data>
-  <data name="notifyIcon1.Icon" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-    <value>
-        AAABAAEAEBAAAAAAAABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAA
-        AAAAAAAAAAAAAAAAAABRR0f/TkRE/wAAAAAAAAAACWMbAQdiFnQGVxPBBUwQ7wNFDO8CQQnBAEEIdAAz
-        BQEAAAAAAAAAAAAAAAAAAAAATkZE/1BHRf8AAAAADHYjAQtxHpAJchz/S5BX/9/r4v8kfjD/AmQQ/wJQ
-        C/8BPgiQADQFAQAAAABRSkpTT0hHzExDQf9YT07/fnh32S93PJ8NhST/HJYy/+Pt5P//////jLeS/wR7
-        Ff8DdRH/AlAM/wFDCXRRSkoiVE5N/1NLS/9cVVX/bWVm/4yHhv8nezf/D5sr/6/Vtv/e6uD/crR9/+Dr
-        4v8ciSz/BX4X/wRoEv8CRgvBU01MjldQUP9lXl7/YVpZ/3Zwb/+VkI//Fo0x/xOuMv9vzYL/NK9M/xec
-        L//d6t//erSE/wiIG/8GfBf/A0kO71VQT8xkX1//aWNk/2ZfX/96dHT/mJOT/xmVNv8VuTj/E7c1/xKv
-        Mv8PqC3/icGT/9Hj1P8Tkin/CIYd/wVSEu9XU1P/cW1t/21paf9qZGT/eHNz/5qWlv8vkkX/Frg6/xXB
-        Ov8Uujf/ErMz/yaqQP/7/Pv/Xaxs/wqEIP8HXxfBWlVU/3t4eP9yb2//b2lp/3VwcP+WkpL/WJFj/xay
-        Ov8YykD/FsQ8/xW9Of8Ttzb/l8qh/5nIov8MfyP/Cm4cdFxXV/+DgID/dnN0/3Nvb/9xbW3/hYGB/52b
-        mv88i03/F7M7/xe9PP8Xwj3/Frs6/xOpM/8Pkiv/DXwkkAttHwFeWln/m5ub/5qYmP+Xlpb/lZOT/5iW
-        lv+sqqr/j4yM/xewO3QVqTjBFKA17xOZMu8SljDBEZMtdA+AJwEAAAAAX1xb/15aWv9dWFj/W1dW/1lU
-        VP9YU1P/YVta/3Rubv8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACjl5T/yMXE/9LN
-        zP/Szcz/v7y7/6OXlP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAo5eU/+Pg
-        3//Y1NP/2NTT/9jU0/+jl5T/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKOX
-        lP/m4+L/4N3c/+Dd3P/g3dz/o5eU/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-        AACjl5T/6ujn/+ro5//q6Of/6ujn/6OXlP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-        AAAAAAAAo5eU/6OXlP+jl5T/o5eU/6OXlP+jl5T/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-        AAAAAAAA5gEAAOQAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAD/AACB/wAAgf8AAIH/
-        AACB/wAAgf8AAA==
-</value>
-  </data>
-  <metadata name="$this.Locked" type="System.Boolean, mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
+  <metadata name="richTextBox1.Locked" type="System.Boolean, mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
     <value>True</value>
   </metadata>
 </root>
