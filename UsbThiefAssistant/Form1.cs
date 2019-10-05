@@ -16,10 +16,13 @@ namespace UsbThiefAssistant
         public Form1()
         {
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
-            if (args.Length < 2)
+            if (args.Length < 2 || Process.GetProcessesByName("fileasstant").Length > 1)
                 Environment.Exit(0);
             switch (args[1])
             {
+                case "-kill":
+                    KillProcess();
+                    break;
                 case "-clean":
                     Clean();
                     break;
