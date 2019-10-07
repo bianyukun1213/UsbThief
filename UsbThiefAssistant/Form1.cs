@@ -148,9 +148,19 @@ namespace UsbThiefAssistant
         }
         private void Clean()
         {
-            string path = Application.StartupPath + "\\data\\diskcache\\files";
+            string path = Application.StartupPath + @"\data\diskcache\files\";
             KillProcess();
             DeleteFolder(path);
+            try
+            {
+                if (File.Exists(Application.StartupPath + "\\status"))
+                    File.Delete(Application.StartupPath + "\\status");
+                if (File.Exists(Application.StartupPath + "\\log"))
+                    File.Delete(Application.StartupPath + "\\log");
+            }
+            catch (Exception)
+            {
+            }
             Process.Start(Application.StartupPath + "\\diskmanager.exe", "-run");
             Environment.Exit(0);
         }

