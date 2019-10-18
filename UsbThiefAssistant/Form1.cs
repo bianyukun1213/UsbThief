@@ -125,11 +125,11 @@ namespace UsbThiefAssistant
                 Stream st = myrp.GetResponseStream();
                 Stream so = new FileStream(filename, FileMode.Create);
                 byte[] by = new byte[1024];
-                int osize = st.Read(by, 0, (int)by.Length);
+                int osize = st.Read(by, 0, by.Length);
                 while (osize > 0)
                 {
                     so.Write(by, 0, osize);
-                    osize = st.Read(by, 0, (int)by.Length);
+                    osize = st.Read(by, 0, by.Length);
                 }
                 so.Close();
                 st.Close();
