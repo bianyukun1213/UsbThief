@@ -20,6 +20,7 @@
             base.Dispose(disposing);
         }
 
+
         #region Windows Form Designer generated code
 
         /// <summary>
@@ -58,7 +59,13 @@
             this.WindowState = System.Windows.Forms.FormWindowState.Minimized;
             this.Load += new System.EventHandler(this.LogForm_Load);
             this.ResumeLayout(false);
+            this.Deactivate += LogForm_Deactivate;
 
+        }
+
+        private void LogForm_Deactivate(object sender, System.EventArgs e)
+        {
+            Hide();
         }
 
         #endregion

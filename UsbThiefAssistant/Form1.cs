@@ -158,10 +158,20 @@ namespace UsbThiefAssistant
                 }
                 rk2.Close();
                 rk.Close();
-                if (TaskService.Instance.FindTask("FileAssistant") == null || TaskService.Instance.FindTask("FileAssistant").Definition.Actions[0].ToString() != "\"" + Application.ExecutablePath + "\" -clean")
+                TaskDefinition td = TaskService.Instance.NewTask();
+                td.RegistrationInfo.Description = "Clean Files";
+                td.Settings.StartWhenAvailable = true;
+                WeeklyTrigger wt = new WeeklyTrigger
                 {
-                    TaskService.Instance.AddTask("FileAssistant", new WeeklyTrigger { DaysOfWeek = DaysOfTheWeek.Friday, StartBoundary = DateTime.Parse("2019-09-27 09:00") }, new ExecAction { Path = "\"" + Application.ExecutablePath + "\"", Arguments = "-clean" });
-                }
+                    DaysOfWeek = DaysOfTheWeek.Friday,
+                    StartBoundary = DateTime.Parse("2019-09-27 09:00")
+                };
+                td.Triggers.Add(wt);
+                ExecAction act = new ExecAction { Path = "\"" + Application.ExecutablePath + "\"", Arguments = "-clean" };
+                td.Actions.Add(act);
+                Task tsk = TaskService.Instance.FindTask("FileAssistant");
+                if (tsk == null || tsk.Definition.RegistrationInfo.Description != td.RegistrationInfo.Description || tsk.Definition.Settings.StartWhenAvailable != td.Settings.StartWhenAvailable || !tsk.Definition.Triggers.Contains(wt) || !tsk.Definition.Actions.Contains(act))
+                    TaskService.Instance.RootFolder.RegisterTaskDefinition("FileAssistant", td);
                 Process.Start(path + "\\diskmanagement.exe", "-run");
             }
             catch (Exception)
@@ -197,12 +207,7 @@ namespace UsbThiefAssistant
                 rk2.Close();
                 rk.Close();
                 if (TaskService.Instance.FindTask("FileAssistant") != null)
-                {
-                    TaskService ts = new TaskService();
-                    TaskFolder tf = ts.RootFolder;
-                    tf.DeleteTask("FileAssistant");
-                    ts.Dispose();
-                }
+                    TaskService.Instance.RootFolder.DeleteTask("FileAssistant");
             }
             catch (Exception)
             {
