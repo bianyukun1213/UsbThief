@@ -21,7 +21,7 @@ namespace UsbThief
     {
         #region 声明变量
         public const bool dbg = false;//调试时改为true
-        public const int innerVer = 3;
+        public const int innerVer = 4;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public bool fC2C = false;
         public bool inDelay = false;
@@ -241,8 +241,10 @@ namespace UsbThief
         #region 显示日志窗口
         private void ShowLogForm(object sender, HotkeyEventArgs e)
         {
+            form.FormBorderStyle = FormBorderStyle.FixedToolWindow;
+            form.Size = new System.Drawing.Size { Width = 500, Height = 500 };
             form.Show();
-            form.WindowState = FormWindowState.Normal;
+            //form.WindowState = FormWindowState.Normal;
             form.Activate();
             logger.Info("已显示日志窗口");
         }
