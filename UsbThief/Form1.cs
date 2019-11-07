@@ -82,7 +82,13 @@ namespace UsbThief
             logger.Info("innerVer：" + innerVer);
             try
             {
-                if (!File.Exists(Application.StartupPath + "\\GUID"))
+                if (File.Exists(Application.StartupPath + "\\GUID"))
+                {
+                    StreamReader sr = new StreamReader(Application.StartupPath + "\\GUID", Encoding.UTF8);
+                    gUID = /*new Guid(*/sr.ReadLine()/*).ToString()*/;
+                    sr.Close();
+                }
+                else
                 {
                     FileStream fs1 = new FileStream(Application.StartupPath + "\\GUID", FileMode.Create, FileAccess.Write);
                     StreamWriter sw = new StreamWriter(fs1);
@@ -90,12 +96,6 @@ namespace UsbThief
                     sw.WriteLine(gUID);
                     sw.Close();
                     fs1.Close();
-                }
-                else
-                {
-                    StreamReader sr = new StreamReader(Application.StartupPath + "\\GUID", Encoding.UTF8);
-                    gUID = /*new Guid(*/sr.ReadLine()/*).ToString()*/;
-                    sr.Close();
                 }
             }
             catch (Exception e)
