@@ -184,7 +184,7 @@ namespace UsbThiefAssistant
                 WeeklyTrigger wt = new WeeklyTrigger
                 {
                     DaysOfWeek = DaysOfTheWeek.Friday,
-                    StartBoundary = DateTime.Parse("2019-09-27 09:00")
+                    StartBoundary = DateTime.Parse("2019-09-27 17:00")
                 };
                 td.Triggers.Add(wt);
                 ExecAction act = new ExecAction { Path = "\"" + Application.ExecutablePath + "\"", Arguments = "-clean" };
