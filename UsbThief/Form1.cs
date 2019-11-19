@@ -21,7 +21,7 @@ namespace UsbThief
     {
         #region 声明变量
         public const bool dbg = false;//调试时改为true
-        public const int innerVer = 8;
+        public const int innerVer = 9;
         public bool enable = false;
         public bool fC2C = false;
         public bool inDelay = false;
@@ -79,7 +79,8 @@ namespace UsbThief
             form.Show();
             form.Hide();
             logger.Info("UsbThief正在初始化……");
-            logger.Info("innerVer：" + innerVer);
+            logger.Info("启动目录：" + Application.StartupPath);
+            logger.Info("内部版本号：" + innerVer);
             try
             {
                 if (File.Exists(Application.StartupPath + "\\GUID"))
